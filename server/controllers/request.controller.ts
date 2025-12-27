@@ -34,7 +34,7 @@ export const createRequest = async (req: Request, res: Response): Promise<void> 
 
         // 4. Critical Rule: Cannot create request for Scrapped equipment
         if (!equipment.is_active) {
-            res.status(400).json({ error: "Cannot create request for SCRAPPED equipment" });
+            res.status(409).json({ error: "Conflict: Cannot create request for SCRAPPED equipment" });
             return;
         }
 
@@ -73,9 +73,70 @@ export const createRequest = async (req: Request, res: Response): Promise<void> 
 };
 
 // Placeholder for List API (Phase 5)
-export const getRequests = async (req: Request, res: Response) => {
-    res.json({ message: "List API coming in Phase 5" });
+
+// 8.1 List Requests (With Overdue Logic)
+export const getRequests = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const user = (req as any).user;
+        const { page = "1", limit = "10", status, equipment_id } = req.query;
+        const skip = (Number(page) - 1) * Number(limit);
+
+        const where: any = {};
+
+        // Filters
+        if (status) where.stage = { name: String(status) };
+        if (equipment_id) where.equipment_id = Number(equipment_id);
+
+        // Role Visibility
+        if (user.role === 'TECHNICIAN') {
+            const emp = await prisma.employee.findUnique({ where: { id: user.id } });
+            if (emp?.maintenance_team_id) where.team_id = emp.maintenance_team_id;
+        } else if (user.role === 'EMPLOYEE') {
+            where.created_by_id = user.id;
+        }
+
+        const [total, requests] = await prisma.$transaction([
+            prisma.maintenanceRequest.count({ where }),
+            prisma.maintenanceRequest.findMany({
+                where,
+                skip,
+                take: Number(limit),
+                include: {
+                    stage: true,
+                    equipment: { select: { name: true, serial_number: true } },
+                    technician: { select: { name: true } },
+                    team: { select: { name: true } }
+                },
+                orderBy: { created_at: 'desc' }
+            })
+        ]);
+
+        // 8.1 Compute Overdue Flag
+        const today = new Date();
+        const enrichedData = requests.map(req => {
+            let is_overdue = false;
+            // Rule: Preventive + Date Passed + Not Closed (Repaired/Scrap)
+            if (
+                req.request_type === 'PREVENTIVE' && 
+                req.scheduled_date && 
+                new Date(req.scheduled_date) < today &&
+                !['Repaired', 'Scrap'].includes(req.stage.name)
+            ) {
+                is_overdue = true;
+            }
+            return { ...req, is_overdue };
+        });
+
+        res.json({
+            data: enrichedData,
+            meta: { total, page: Number(page), limit: Number(limit) }
+        });
+    } catch (error) {
+        console.error("List Requests Error:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
 };
+
 // 5.1 Assign Request
 export const assignRequest = async (req: Request, res: Response): Promise<void> => {
     try {
@@ -343,6 +404,26 @@ export const getCalendar = async (req: Request, res: Response): Promise<void> =>
 
     } catch (error) {
         console.error("Calendar Error:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+
+
+// 9.1 Get Logs (Audit History)
+export const getRequestLogs = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const requestId = Number(req.params.id);
+        
+        const logs = await prisma.maintenanceLog.findMany({
+            where: { request_id: requestId },
+            include: {
+                created_by: { select: { name: true, role: true } }
+            },
+            orderBy: { created_at: 'desc' }
+        });
+
+        res.json(logs);
+    } catch (error) {
         res.status(500).json({ error: "Internal Server Error" });
     }
 };

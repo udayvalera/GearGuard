@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createRequest, getRequests , assignRequest , updateStatus , getCalendar } from "../controllers/request.controller.js";
+import { createRequest, getRequests , assignRequest , updateStatus , getCalendar, getRequestLogs } from "../controllers/request.controller.js";
 import { authenticate } from "../middleware/auth.middleware.js";
 
 const router = Router();
@@ -21,4 +21,7 @@ router.patch("/:id/assign", assignRequest);
 
 // 6.1 Update Status (Workflow Transitions)
 router.patch("/:id/status", updateStatus);
+
+// 9.1 View Audit Logs
+router.get("/:id/logs", getRequestLogs);
 export default router;
