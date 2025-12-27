@@ -5,15 +5,105 @@ import { authenticate } from "../middleware/auth.middleware.js";
 
 const router = Router();
 
+/**
+ * @swagger
+ * tags:
+ *   name: Auth
+ *   description: Authentication management
+ */
+
+/**
+ * @swagger
+ * /auth/signup:
+ *   post:
+ *     summary: Register a new employee
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *               - email
+ *               - password
+ *             properties:
+ *               name:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               password:
+ *                 type: string
+ *                 format: password
+ *               role:
+ *                 type: string
+ *                 enum: [EMPLOYEE, TECHNICIAN, MANAGER, ADMIN]
+ *     responses:
+ *       201:
+ *         description: User created
+ *       400:
+ *         description: User already exists
+ */
 router.post("/signup", signup);
+
+/**
+ * @swagger
+ * /auth/login:
+ *   post:
+ *     summary: Log in and receive a cookie
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               password:
+ *                 type: string
+ *                 format: password
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *       401:
+ *         description: Invalid credentials
+ */
 router.post("/login", login);
+
+/**
+ * @swagger
+ * /auth/logout:
+ *   post:
+ *     summary: Log out (clear auth cookie)
+ *     tags: [Auth]
+ *     responses:
+ *       200:
+ *         description: Logout successful
+ */
 router.post("/logout", logout);
 
-// PROTECTED: Only authenticated users can access /me
+/**
+ * @swagger
+ * /auth/me:
+ *   get:
+ *     summary: Get current logged-in user
+ *     tags: [Auth]
+ *     security:
+ *       - cookieAuth: []
+ *     responses:
+ *       200:
+ *         description: User profile
+ *       401:
+ *         description: Not authenticated
+ */
 router.get("/me", authenticate(), getMe);
-
-router.get('/', (req: Request, res: Response) => {
-    res.json({ message: 'Auth route working' });
-});
 
 export default router;
