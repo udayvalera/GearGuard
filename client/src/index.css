@@ -1,1 +1,62 @@
 @import "tailwindcss";
+
+@theme {
+  /* Colors */
+  --color-brand-500: #3b82f6; /* primary.500 (Blue-500 as proxy) */
+  --color-brand-600: #2563eb;
+  --color-brand-50: #eff6ff;
+  
+  --color-surface-0: #ffffff;
+  --color-surface-50: #f8fafc;
+  --color-surface-100: #f1f5f9;
+  --color-surface-200: #e2e8f0;
+
+  --color-text-primary: #0f172a;   /* neutral.900 */
+  --color-text-secondary: #64748b; /* neutral.500 */
+  --color-text-tertiary: #94a3b8;  /* neutral.400 */
+
+  /* Semantic */
+  --color-success-600: #16a34a; /* green.600 */
+  --color-warning-500: #f97316; /* orange.500 */
+  --color-error-600: #dc2626;   /* red.600 */
+  --color-info-500: #3b82f6;    /* blue.500 */
+  --color-border-200: #e2e8f0;  /* neutral.200 */
+
+  /* Typography */
+  --font-inter: 'Inter', sans-serif;
+  --font-roboto: 'Roboto', sans-serif;
+  
+  /* Spacing Scale */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-xxl: 48px;
+
+  /* Border Radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  
+  /* Shadows */
+  --shadow-z1: 0 1px 2px rgba(0,0,0,0.05);
+  --shadow-z2: 0 4px 6px rgba(0,0,0,0.05);
+  --shadow-z3: 0 10px 15px rgba(0,0,0,0.1);
+  --shadow-focus: 0 0 0 3px rgba(59, 130, 246, 0.3);
+}
+
+@layer base {
+  body {
+    font-family: var(--font-inter);
+    color: var(--color-text-primary);
+    background-color: var(--color-surface-50);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-inter);
+    color: var(--color-text-primary);
+    font-weight: 600;
+  }
+}
