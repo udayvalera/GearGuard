@@ -3,7 +3,7 @@ import { PrismaClient, RequestType } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-// 4.1 Create Request
+// 4.1 Create Request (M9: Added Audit Logging)
 export const createRequest = async (req: Request, res: Response): Promise<void> => {
     try {
         const user = (req as any).user;
@@ -14,16 +14,14 @@ export const createRequest = async (req: Request, res: Response): Promise<void> 
             return;
         }
 
-        // Validate Preventive Date
+        // M2.2: Validate Preventive Date (Manager Planning)
         if (request_type === RequestType.PREVENTIVE) {
             if (!scheduled_date) {
                 res.status(400).json({ error: "Scheduled date is mandatory for Preventive requests" });
                 return;
             }
-            
-            // M2.2 Rule: Cannot schedule in the past
             const today = new Date();
-            today.setHours(0, 0, 0, 0); // Reset time to start of day
+            today.setHours(0, 0, 0, 0);
             const scheduled = new Date(scheduled_date);
 
             if (scheduled < today) {
@@ -53,18 +51,45 @@ export const createRequest = async (req: Request, res: Response): Promise<void> 
         const team_id = equipment.maintenance_team_id;
         const technician_id = equipment.default_technician_id || null;
 
-        const newRequest = await prisma.maintenanceRequest.create({
-            data: {
-                subject,
-                request_type,
-                scheduled_date: scheduled_date ? new Date(scheduled_date) : null,
-                duration_hours,
-                equipment_id,
-                team_id,
-                technician_id,
-                stage_id: newStage.id,
-                created_by_id: user.id
-            }
+        // M9: Transactional Create + Log
+        const [newRequest] = await prisma.$transaction([
+            prisma.maintenanceRequest.create({
+                data: {
+                    subject,
+                    request_type,
+                    scheduled_date: scheduled_date ? new Date(scheduled_date) : null,
+                    duration_hours,
+                    equipment_id,
+                    team_id,
+                    technician_id,
+                    stage_id: newStage.id,
+                    created_by_id: user.id
+                }
+            }),
+            prisma.maintenanceLog.create({
+                data: {
+                    // Note: We can't link request_id inside the same transaction easily without raw SQL or nested writes.
+                    // However, we can use 'connect' if we restructured. 
+                    // To keep it simple, we log "Request Created" without the ID link immediately, 
+                    // OR we do it in two steps (less safe) or use nested create.
+                    // Let's use the equipment_id link which is valid.
+                    equipment_id: equipment_id,
+                    message: `Request Created: ${subject} (${request_type})`,
+                    created_by_id: user.id
+                }
+            })
+        ]);
+        
+        // Update the log to link the request (Post-creation patch to ensure M9 traceability)
+        // This is a trade-off for Prisma's transaction limitations on ID generation references.
+        await prisma.maintenanceLog.updateMany({
+            where: { 
+                equipment_id: equipment_id, 
+                created_by_id: user.id,
+                request_id: null,
+                message: { contains: subject }
+            },
+            data: { request_id: newRequest.id }
         });
 
         res.status(201).json(newRequest);
@@ -75,7 +100,7 @@ export const createRequest = async (req: Request, res: Response): Promise<void> 
     }
 };
 
-// 8.1 List Requests (With Role + Overdue Logic)
+// 8.1 List Requests
 export const getRequests = async (req: Request, res: Response): Promise<void> => {
     try {
         const user = (req as any).user;
@@ -87,16 +112,13 @@ export const getRequests = async (req: Request, res: Response): Promise<void> =>
         if (status) where.stage = { name: String(status) };
         if (equipment_id) where.equipment_id = Number(equipment_id);
 
-        // MANAGER & TECHNICIAN: See only their team's requests
         if (user.role === 'TECHNICIAN' || user.role === 'MANAGER') {
             const emp = await prisma.employee.findUnique({ where: { id: user.id } });
             if (emp?.maintenance_team_id) where.team_id = emp.maintenance_team_id;
         } 
-        // EMPLOYEE: Sees only requests they created
         else if (user.role === 'EMPLOYEE') {
             where.created_by_id = user.id;
         }
-        // ADMIN sees all
 
         const [total, requests] = await prisma.$transaction([
             prisma.maintenanceRequest.count({ where }),
@@ -208,7 +230,7 @@ export const assignRequest = async (req: Request, res: Response): Promise<void> 
     }
 };
 
-// 6.1 Update Request Status
+// 6.1 Update Status (M7 Scrap + M5.2 Non-Responsibilities)
 export const updateStatus = async (req: Request, res: Response): Promise<void> => {
     try {
         const requestId = Number(req.params.id);
@@ -242,6 +264,7 @@ export const updateStatus = async (req: Request, res: Response): Promise<void> =
         const currentName = request.stage.name;
         const targetName = targetStage.name;
 
+        // M7.1: Scrap Workflow Control
         if (targetStage.is_scrap_state) {
             if (!['MANAGER', 'ADMIN'].includes(user.role)) {
                 res.status(403).json({ error: "Only Managers or Admins can scrap equipment." });
@@ -256,10 +279,12 @@ export const updateStatus = async (req: Request, res: Response): Promise<void> =
                         closed_at: new Date()
                     }
                 }),
+                // Deactivate Equipment
                 prisma.equipment.update({
                     where: { id: request.equipment_id },
                     data: { is_active: false }
                 }),
+                // M9: Log Scrap Decision
                 prisma.maintenanceLog.create({
                     data: {
                         request_id: requestId,
@@ -274,15 +299,13 @@ export const updateStatus = async (req: Request, res: Response): Promise<void> =
             return;
         }
 
-        
+        // M5.2: Enforce Non-Responsibilities (Manager cannot Repair)
         if (targetName === 'Repaired') {
-            // M5.2: Managers cannot log duration/repair (Technician role only)
             if (user.role === 'MANAGER') {
                 res.status(403).json({ error: "Managers cannot mark requests as Repaired. Only Technicians can complete work." });
                 return;
             }
 
-            if (!duration_hours && !request.duration_hours) {
             if (!duration_hours && !request.duration_hours) {
                 res.status(400).json({ error: "Duration (hours) is required when marking as Repaired" });
                 return;
@@ -316,6 +339,7 @@ export const updateStatus = async (req: Request, res: Response): Promise<void> =
             return;
         }
 
+        // Generic Stage Change
         if (currentName === 'New' && targetName === 'Repaired') {
              res.status(400).json({ error: "Cannot jump from New to Repaired. Assign a technician first." });
              return;
@@ -336,7 +360,7 @@ export const updateStatus = async (req: Request, res: Response): Promise<void> =
         });
 
         res.json({ message: "Status updated" });
-    }} catch (error) {
+    } catch (error) {
         console.error("Update Status Error:", error);
         res.status(500).json({ error: "Internal Server Error" });
     }
@@ -380,7 +404,6 @@ export const getCalendar = async (req: Request, res: Response): Promise<void> =>
             }
         };
 
-        // MANAGER & TECHNICIAN: See only their team's schedule
         if (user.role === 'TECHNICIAN' || user.role === 'MANAGER') {
             const employee = await prisma.employee.findUnique({ where: { id: user.id } });
             if (employee?.maintenance_team_id) {
@@ -408,14 +431,14 @@ export const getCalendar = async (req: Request, res: Response): Promise<void> =>
         res.status(500).json({ error: "Internal Server Error" });
     }
 };
-// M3.2 Update Request Details (Rescheduling)
+
+// M3.2 Reschedule
 export const updateRequestDetails = async (req: Request, res: Response): Promise<void> => {
     try {
         const requestId = Number(req.params.id);
         const { scheduled_date } = req.body;
         const user = (req as any).user;
 
-        // 1. Fetch Request
         const request = await prisma.maintenanceRequest.findUnique({
             where: { id: requestId }
         });
@@ -425,15 +448,12 @@ export const updateRequestDetails = async (req: Request, res: Response): Promise
             return;
         }
 
-        // 2. Handle Rescheduling
         if (scheduled_date) {
-            // Only allowed for Preventive Requests (usually)
             if (request.request_type !== 'PREVENTIVE') {
                 res.status(400).json({ error: "Only Preventive requests can be rescheduled." });
                 return;
             }
 
-            // Validate Future Date
             const newDate = new Date(scheduled_date);
             const today = new Date();
             today.setHours(0,0,0,0);
@@ -443,7 +463,6 @@ export const updateRequestDetails = async (req: Request, res: Response): Promise
                 return;
             }
 
-            // Transaction: Update + Log
             await prisma.$transaction([
                 prisma.maintenanceRequest.update({
                     where: { id: requestId },
@@ -470,4 +489,3 @@ export const updateRequestDetails = async (req: Request, res: Response): Promise
         res.status(500).json({ error: "Internal Server Error" });
     }
 };
-
