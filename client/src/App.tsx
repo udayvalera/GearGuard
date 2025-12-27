@@ -1,28 +1,26 @@
-import React from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "./context/AuthContext";
-import Login from "./pages/Login";
-import Signup from "./pages/Signup";
-import Protected from "./pages/Protected";
-import AdminPage from "./pages/AdminPage";
-import ProtectedRoute from "./components/ProtectedRoute";
-
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { DataProvider } from "./context/DataContext";
+import AppLayout from "./components/Layout";
+import Dashboard from "./pages/manager/Dashboard";
+import Kanban from "./pages/manager/Kanban";
+import Calendar from "./pages/manager/Calendar";
+import Reports from "./pages/manager/Reports";
 
 function App() {
   return (
     <Router>
-      <AuthProvider>
+      <DataProvider>
         <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route element={<ProtectedRoute allowedRoles={['user', 'admin']} />}>
-            <Route path="/" element={<Protected />} />
-          </Route>
-          <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
-            <Route path="/admin" element={<AdminPage />} />
+          <Route path="/" element={<AppLayout />}>
+            <Route index element={<Dashboard />} />
+            <Route path="kanban" element={<Kanban />} />
+            <Route path="calendar" element={<Calendar />} />
+            <Route path="reports" element={<Reports />} />
+            {/* Redirect any unknown route to dashboard */}
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
-      </AuthProvider>
+      </DataProvider>
     </Router>
   );
 }
