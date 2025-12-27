@@ -153,3 +153,143 @@ export const assignRequest = async (req: Request, res: Response): Promise<void> 
     }
 };
 
+
+// 6.1 Update Request Status (Workflow Engine)
+export const updateStatus = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const requestId = Number(req.params.id);
+        const { stage_id, duration_hours } = req.body;
+        const user = (req as any).user;
+
+        if (!stage_id) {
+            res.status(400).json({ error: "Stage ID is required" });
+            return;
+        }
+
+        // 1. Fetch Request & Current Stage
+        const request = await prisma.maintenanceRequest.findUnique({
+            where: { id: requestId },
+            include: { stage: true, equipment: true }
+        });
+
+        if (!request) {
+            res.status(404).json({ error: "Request not found" });
+            return;
+        }
+
+        // 2. Fetch Target Stage
+        const targetStage = await prisma.maintenanceStage.findUnique({
+            where: { id: stage_id }
+        });
+
+        if (!targetStage) {
+            res.status(404).json({ error: "Invalid Stage ID" });
+            return;
+        }
+
+        // 3. State Machine & Rules
+        const currentName = request.stage.name;
+        const targetName = targetStage.name;
+
+        // A. Handle SCRAP Logic (Critical)
+        if (targetStage.is_scrap_state) {
+            // Only Manager/Admin can Scrap
+            if (!['MANAGER', 'ADMIN'].includes(user.role)) {
+                res.status(403).json({ error: "Only Managers or Admins can scrap equipment." });
+                return;
+            }
+
+            // Transaction: Update Request + Deactivate Equipment + Log
+            await prisma.$transaction([
+                prisma.maintenanceRequest.update({
+                    where: { id: requestId },
+                    data: { 
+                        stage_id,
+                        closed_at: new Date()
+                    }
+                }),
+                prisma.equipment.update({
+                    where: { id: request.equipment_id },
+                    data: { is_active: false }
+                }),
+                prisma.maintenanceLog.create({
+                    data: {
+                        request_id: requestId,
+                        equipment_id: request.equipment_id,
+                        message: `EQUIPMENT SCRAPPED via Request #${requestId}`,
+                        created_by_id: user.id
+                    }
+                })
+            ]);
+            
+            res.json({ message: "Equipment Scrapped and Request Closed" });
+            return;
+        }
+
+        // B. Handle REPAIRED Logic
+        if (targetName === 'Repaired') {
+            // Must define duration
+            if (!duration_hours && !request.duration_hours) {
+                res.status(400).json({ error: "Duration (hours) is required when marking as Repaired" });
+                return;
+            }
+
+            // Normal flow: In Progress -> Repaired
+            if (currentName !== 'In Progress') {
+                res.status(400).json({ error: "Invalid Transition: Must be 'In Progress' before 'Repaired'" });
+                return;
+            }
+
+            await prisma.$transaction([
+                prisma.maintenanceRequest.update({
+                    where: { id: requestId },
+                    data: { 
+                        stage_id,
+                        duration_hours: duration_hours || request.duration_hours,
+                        closed_at: new Date()
+                    }
+                }),
+                prisma.maintenanceLog.create({
+                    data: {
+                        request_id: requestId,
+                        equipment_id: request.equipment_id,
+                        message: `Work completed. Duration: ${duration_hours || request.duration_hours} hrs`,
+                        created_by_id: user.id
+                    }
+                })
+            ]);
+
+            res.json({ message: "Maintenance Completed" });
+            return;
+        }
+
+        // C. Standard Transitions (e.g. New -> In Progress)
+        // Prevent skipping steps if needed, or just allow linear flow
+        if (currentName === 'New' && targetName === 'Repaired') {
+             res.status(400).json({ error: "Cannot jump from New to Repaired. Assign a technician first." });
+             return;
+        }
+
+        // Generic Update
+        await prisma.maintenanceRequest.update({
+            where: { id: requestId },
+            data: { stage_id }
+        });
+
+        // Audit Log
+        await prisma.maintenanceLog.create({
+            data: {
+                request_id: requestId,
+                equipment_id: request.equipment_id,
+                message: `Stage changed from ${currentName} to ${targetName}`,
+                created_by_id: user.id
+            }
+        });
+
+        res.json({ message: "Status updated" });
+    } catch (error) {
+        console.error("Update Status Error:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+

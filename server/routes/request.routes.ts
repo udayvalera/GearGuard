@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createRequest, getRequests , assignRequest } from "../controllers/request.controller.js";
+import { createRequest, getRequests , assignRequest , updateStatus } from "../controllers/request.controller.js";
 import { authenticate } from "../middleware/auth.middleware.js";
 
 const router = Router();
@@ -15,4 +15,7 @@ router.get("/", getRequests);
 
 // 5.1 Assign Technician (Manager/Admin/Tech self-assign)
 router.patch("/:id/assign", assignRequest);
+
+// 6.1 Update Status (Workflow Transitions)
+router.patch("/:id/status", updateStatus);
 export default router;
