@@ -9,9 +9,23 @@ import { Badge } from '../../components/design-system/Badge';
 import { clsx } from 'clsx';
 
 const ScheduleModal = ({ isOpen, onClose, date, onSchedule }: any) => {
-    const { equipment, users } = useData();
+    const { equipment, teams } = useData();
     const activeEquipment = equipment.filter(e => e.isActive);
-    const technicians = users.filter(u => u.role === 'TECHNICIAN');
+    
+    // Derive technicians from teams data
+    const technicians = useMemo(() => {
+        const allTechs: { id: string; name: string }[] = [];
+        teams.forEach(team => {
+            if (team.technicians) {
+                team.technicians.forEach(tech => {
+                    if (!allTechs.find(t => t.id === tech.id)) {
+                        allTechs.push({ id: tech.id, name: tech.name });
+                    }
+                });
+            }
+        });
+        return allTechs;
+    }, [teams]);
 
     const [formData, setFormData] = useState({
         equipmentId: '',
@@ -100,7 +114,7 @@ const ScheduleModal = ({ isOpen, onClose, date, onSchedule }: any) => {
 };
 
 const Calendar = () => {
-    const { requests, addRequest } = useData();
+    const { requests, createRequest } = useData();
     const [currentDate, setCurrentDate] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
@@ -118,25 +132,12 @@ const Calendar = () => {
         return preventiveRequests.filter(r => isSameDay(parseISO(r.dueDate), date));
     };
 
-    const generateId = () => `req-${Date.now()}`;
+
 
     const handleSchedule = (data: any) => {
-        addRequest({
-            id: generateId(),
-            createdAt: new Date().toISOString(),
-            logs: [{
-                id: `log-${Date.now()}`,
-                timestamp: new Date().toISOString(),
-                message: 'Preventive maintenance scheduled via Calendar',
-                authorId: 'manager'
-            }],
-            equipmentId: data.equipmentId,
-            assignedTechId: data.techId || undefined,
-            title: data.title,
-            description: data.description,
-            priority: data.priority,
+        createRequest({
+            ...data,
             type: 'Preventive',
-            status: 'New',
             dueDate: data.dueDate
         });
     };

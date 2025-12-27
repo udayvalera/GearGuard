@@ -1,9 +1,12 @@
 import { Router } from "express";
 import { getMaintenanceStages } from "../controllers/stages.controller.js";
 import { requireRole } from "../middleware/requireRole.js";
+import { authenticate } from "../middleware/auth.middleware.js";
 import { Role } from "@prisma/client";
 
 const router = Router();
+
+router.use(authenticate());
 
 /**
  * GET /api/v1/stages
@@ -27,8 +30,14 @@ const router = Router();
  *             schema:
  *               type: array
  *               items:
- *                 type: string
- *                 example: New
+ *                 type: object
+ *                 properties:
+ *                   id:
+ *                     type: integer
+ *                   name:
+ *                     type: string
+ *                   sequence:
+ *                     type: integer
  *       403:
  *         description: Access denied
  *       500:
@@ -37,7 +46,7 @@ const router = Router();
 
 router.get(
   "/",
-  requireRole(Role.ADMIN, Role.TECHNICIAN),
+  requireRole(Role.ADMIN, Role.MANAGER, Role.TECHNICIAN),
   getMaintenanceStages
 );
 

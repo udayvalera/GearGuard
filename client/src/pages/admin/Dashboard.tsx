@@ -28,23 +28,28 @@ const AdminDashboard = () => {
     }, [users, equipment]);
 
     const userDistribution = useMemo(() => {
-        const dist = {
-            Employee: 0,
-            Technician: 0,
-            Manager: 0,
-            Admin: 0
+        const dist: Record<string, number> = {
+            EMPLOYEE: 0,
+            TECHNICIAN: 0,
+            MANAGER: 0,
+            ADMIN: 0
         };
 
         users.forEach(u => {
-            // @ts-ignore
             if (dist[u.role] !== undefined) {
-                // @ts-ignore
                 dist[u.role]++;
             }
         });
 
+        const roleLabels: Record<string, string> = {
+            EMPLOYEE: 'Employee',
+            TECHNICIAN: 'Technician',
+            MANAGER: 'Manager',
+            ADMIN: 'Admin'
+        };
+
         return Object.entries(dist).map(([role, count]) => ({
-            name: role,
+            name: roleLabels[role] || role,
             count,
             fill: 'var(--color-brand-500)'
         }));

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
     DndContext,
     DragOverlay,
@@ -47,43 +48,71 @@ const KanbanColumn = ({ id, title, color, children, isOver }: any) => {
     );
 };
 
-const ScrapModal = ({ isOpen, onClose, onConfirm, equipmentName }: any) => {
+const ScrapModal = ({ isOpen, onClose, onConfirm, equipmentName, error, isLoading }: any) => {
     if (!isOpen) return null;
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-            <div className="bg-[var(--color-surface-0)] rounded-[var(--radius-xl)] shadow-[var(--shadow-z3)] max-w-md w-full p-6 animate-in zoom-in-95 duration-200">
-                <div className="flex items-center gap-3 text-[var(--color-error-600)] mb-4">
-                    <div className="p-2 bg-red-50 rounded-full">
+    
+    return createPortal(
+        <div 
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            style={{ isolation: 'isolate' }}
+        >
+            <div 
+                className="bg-white rounded-xl shadow-2xl p-6"
+                style={{ width: '100%', maxWidth: '28rem', minWidth: '320px' }}
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="flex items-center gap-3 text-red-600 mb-4">
+                    <div className="p-2 bg-red-50 rounded-full shrink-0">
                         <AlertOctagon size={24} />
                     </div>
-                    <h2 className="text-xl font-bold text-[var(--color-text-primary)]">Confirm Asset Scrap?</h2>
+                    <h2 className="text-xl font-bold text-gray-900">Confirm Asset Scrap?</h2>
                 </div>
-                <p className="text-[var(--color-text-secondary)] mb-6">
-                    You are about to scrap <strong className="text-[var(--color-text-primary)]">{equipmentName}</strong>.
-                    This is an irreversible action that will:
+                
+                {error && (
+                    <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                        <p className="text-sm text-red-700 font-medium">{error}</p>
+                    </div>
+                )}
+                
+                <p className="text-gray-600 mb-6">
+                    You are about to scrap <strong className="text-gray-900">{equipmentName}</strong>. This is an irreversible action that will:
                 </p>
-                <ul className="list-disc list-inside text-sm text-[var(--color-text-secondary)] mb-6 space-y-2 bg-[var(--color-surface-50)] p-4 rounded-[var(--radius-md)] border border-[var(--color-border-200)]">
+                <ul className="list-disc list-inside text-sm text-gray-600 mb-6 space-y-2 bg-gray-50 p-4 rounded-lg border border-gray-200">
                     <li>Mark the equipment as <strong>Inactive</strong>.</li>
                     <li>Cancel all future <strong>Preventive Maintenance</strong>.</li>
                     <li>Log a permanent record of this disposal.</li>
                 </ul>
                 <div className="flex justify-end gap-3">
-                    <Button variant="ghost" onClick={onClose}>
+                    <Button variant="ghost" onClick={onClose} disabled={isLoading}>
                         Cancel
                     </Button>
-                    <Button variant="danger" onClick={onConfirm} className="shadow-red-200">
-                        Confirm Scrap
+                    <Button variant="danger" onClick={onConfirm} disabled={isLoading}>
+                        {isLoading ? 'Processing...' : 'Confirm Scrap'}
                     </Button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 
 export default function Kanban() {
-    const { requests, equipment, users, updateRequestStatus, reassignTechnician, scrapEquipment } = useData();
+    const { requests, equipment, users, teams, updateRequestStatus, reassignTechnician, scrapEquipment } = useData();
     const [activeId, setActiveId] = useState<string | null>(null);
     const [scrapModal, setScrapModal] = useState<{ isOpen: boolean; requestId: string; equipmentId: string; equipmentName: string } | null>(null);
+    const [scrapError, setScrapError] = useState<string | null>(null);
+    const [scrapLoading, setScrapLoading] = useState(false);
+
+    // Helper to get technicians for a specific request based on request's team
+    const getTechniciansForRequest = (req: typeof requests[0]) => {
+        // Use request's teamId directly (this matches backend validation)
+        const team = teams.find(t => t.id === req.teamId);
+        if (team?.technicians && team.technicians.length > 0) {
+            return team.technicians;
+        }
+        // Fallback: return empty array if no team found (prevent invalid assignments)
+        return [];
+    };
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -112,11 +141,13 @@ export default function Kanban() {
         // SCENARIO: Moving to Scrap
         if (newStatus === 'Scrap') {
             const equip = equipment.find(e => e.id === request.equipmentId);
+            // Use equipmentName from request (from backend), or fallback to equipment lookup
+            const equipName = request.equipmentName || equip?.name || 'Unknown Item';
             setScrapModal({
                 isOpen: true,
                 requestId,
                 equipmentId: request.equipmentId,
-                equipmentName: equip?.name || 'Unknown Item'
+                equipmentName: equipName
             });
             return;
         }
@@ -125,16 +156,32 @@ export default function Kanban() {
         updateRequestStatus(requestId, newStatus);
     };
 
-    const handleScrapConfirm = () => {
+    const handleScrapConfirm = async () => {
         if (scrapModal) {
-            scrapEquipment(scrapModal.requestId, scrapModal.equipmentId);
-            setScrapModal(null);
+            setScrapLoading(true);
+            setScrapError(null);
+            
+            const result = await scrapEquipment(scrapModal.requestId, scrapModal.equipmentId);
+            
+            setScrapLoading(false);
+            
+            if (result.success) {
+                setScrapModal(null);
+                setScrapError(null);
+            } else {
+                setScrapError(result.error || 'Failed to scrap equipment');
+            }
         }
+    };
+    
+    const handleScrapClose = () => {
+        setScrapModal(null);
+        setScrapError(null);
     };
 
     const activeRequest = activeId ? requests.find(r => r.id === activeId) : null;
     const activeEquipment = activeRequest ? equipment.find(e => e.id === activeRequest.equipmentId) : undefined;
-    const technicians = users.filter(u => u.role === 'TECHNICIAN');
+    const activeTechnicians = activeRequest ? getTechniciansForRequest(activeRequest) : [];
 
     return (
         <>
@@ -168,7 +215,7 @@ export default function Kanban() {
                                             key={req.id}
                                             request={req}
                                             equipment={equipment.find(e => e.id === req.equipmentId)}
-                                            technicians={technicians}
+                                            technicians={getTechniciansForRequest(req)}
                                             onReassign={reassignTechnician}
                                         />
                                     ))}
@@ -181,7 +228,7 @@ export default function Kanban() {
                             <KanbanCard
                                 request={activeRequest}
                                 equipment={activeEquipment}
-                                technicians={technicians}
+                                technicians={activeTechnicians}
                                 onReassign={() => { }}
                                 isOverlay
                             />
@@ -193,8 +240,10 @@ export default function Kanban() {
             <ScrapModal
                 isOpen={!!scrapModal}
                 equipmentName={scrapModal?.equipmentName}
-                onClose={() => setScrapModal(null)}
+                onClose={handleScrapClose}
                 onConfirm={handleScrapConfirm}
+                error={scrapError}
+                isLoading={scrapLoading}
             />
         </>
     );

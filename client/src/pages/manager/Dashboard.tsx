@@ -16,7 +16,22 @@ import { KPICard } from '../../components/common/KPICard';
 import { Card } from '../../components/design-system/Card';
 
 const Dashboard = () => {
-    const { requests, equipment, users } = useData();
+    const { requests, equipment, teams } = useData();
+
+    // Derive technicians from teams data (managers have access to teams, not full users list)
+    const technicians = useMemo(() => {
+        const allTechs: { id: string; name: string }[] = [];
+        teams.forEach(team => {
+            if (team.technicians) {
+                team.technicians.forEach(tech => {
+                    if (!allTechs.find(t => t.id === tech.id)) {
+                        allTechs.push({ id: tech.id, name: tech.name });
+                    }
+                });
+            }
+        });
+        return allTechs;
+    }, [teams]);
 
     // 1. KPI Calculations
     const kpis = useMemo(() => {
@@ -37,8 +52,8 @@ const Dashboard = () => {
     const chartData = useMemo(() => {
         const techMap = new Map<string, number>();
 
-        users.filter(u => u.role === 'TECHNICIAN').forEach(u => {
-            techMap.set(u.id, 0);
+        technicians.forEach(tech => {
+            techMap.set(tech.id, 0);
         });
 
         requests.forEach(r => {
@@ -49,14 +64,14 @@ const Dashboard = () => {
         });
 
         return Array.from(techMap.entries()).map(([techId, count]) => {
-            const tech = users.find(u => u.id === techId);
+            const tech = technicians.find(t => t.id === techId);
             return {
                 name: tech?.name.split(' ')[0] || 'Unknown',
                 count,
                 fill: count > 3 ? 'var(--color-error-600)' : 'var(--color-brand-500)'
             };
         });
-    }, [requests, users]);
+    }, [requests, technicians]);
 
     // 3. Recent Activity Feed
     const activityFeed = useMemo(() => {

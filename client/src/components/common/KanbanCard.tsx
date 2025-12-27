@@ -1,7 +1,7 @@
 import React from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import type { MaintenanceRequest, User, Equipment } from '../../types';
+import type { MaintenanceRequest, User, Equipment, TeamMember } from '../../types';
 import { Clock, AlertCircle, Calendar, User as UserIcon } from 'lucide-react';
 import { format, parseISO, isPast } from 'date-fns';
 import { Card } from '../design-system/Card';
@@ -10,7 +10,7 @@ import { Badge } from '../design-system/Badge';
 interface KanbanCardProps {
     request: MaintenanceRequest;
     equipment?: Equipment;
-    technicians: User[];
+    technicians: (User | TeamMember)[];
     onReassign: (reqId: string, teaId: string) => void;
     isOverlay?: boolean;
 }

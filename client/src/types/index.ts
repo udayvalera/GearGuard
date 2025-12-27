@@ -8,10 +8,18 @@ export interface User {
     avatarUrl?: string; // Optional URL for avatar image
 }
 
+export interface TeamMember {
+    id: string;
+    name: string;
+    email: string;
+    role: UserRole;
+}
+
 export interface Team {
     id: string;
     name: string;
     technicianIds: string[];
+    technicians?: TeamMember[];
     managerId?: string;
     managerName?: string;
 }
@@ -45,6 +53,8 @@ export interface LogEntry {
 export interface MaintenanceRequest {
     id: string;
     equipmentId: string;
+    equipmentName?: string; // Equipment name for display
+    teamId: string; // Team ID for filtering technicians
     title: string;
     description: string;
     priority: RequestPriority;
@@ -54,4 +64,5 @@ export interface MaintenanceRequest {
     dueDate: string; // ISO Date string
     createdAt: string; // ISO Date string
     logs: LogEntry[];
+    durationHours?: number;
 }

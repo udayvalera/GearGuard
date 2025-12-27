@@ -59,12 +59,12 @@ export const createRequest = async (req: Request, res: Response): Promise<void> 
                 }
             })
         ]);
-        
+
         // Update the log to link the request (Post-creation patch to ensure M9 traceability)
         // This is a trade-off for Prisma's transaction limitations on ID generation references.
         await prisma.maintenanceLog.updateMany({
-            where: { 
-                equipment_id: equipment_id, 
+            where: {
+                equipment_id: equipment_id,
                 created_by_id: user.id,
                 request_id: null,
                 message: { contains: subject }
@@ -92,10 +92,24 @@ export const getRequests = async (req: Request, res: Response): Promise<void> =>
         if (status) where.stage = { name: String(status) };
         if (equipment_id) where.equipment_id = Number(equipment_id);
 
-        if (user.role === 'TECHNICIAN' || user.role === 'MANAGER') {
+        if (user.role === 'TECHNICIAN') {
             const emp = await prisma.employee.findUnique({ where: { id: user.id } });
             if (emp?.maintenance_team_id) where.team_id = emp.maintenance_team_id;
-        } 
+        }
+        else if (user.role === 'MANAGER') {
+            // Managers see requests from teams they manage (via manager_id), not maintenance_team_id
+            const managedTeams = await prisma.maintenanceTeam.findMany({
+                where: { manager_id: user.id },
+                select: { id: true }
+            });
+            const teamIds = managedTeams.map(t => t.id);
+            if (teamIds.length > 0) {
+                where.team_id = { in: teamIds };
+            } else {
+                // Manager has no teams assigned - return empty
+                where.team_id = -1; // This will match nothing
+            }
+        }
         else if (user.role === 'EMPLOYEE') {
             where.created_by_id = user.id;
         }
@@ -110,7 +124,18 @@ export const getRequests = async (req: Request, res: Response): Promise<void> =>
                     stage: true,
                     equipment: { select: { name: true, serial_number: true } },
                     technician: { select: { name: true } },
-                    team: { select: { name: true } }
+                    team: { select: { name: true } },
+                    logs: {
+                        orderBy: { created_at: 'desc' },
+                        take: 1, // Only get the latest log for list view, OR fetch all if needed for dashboard feed? 
+                        // The Dashboard needs "Recent Activity Feed". 
+                        // The dashboard component flatMaps ALL logs from requests. 
+                        // So we should fetch more than 1 if we want to show history.
+                        // Let's fetch last 5 logs per request for efficiency, or just fetch them separately?
+                        // "Dashboard.tsx" -> `requests.flatMap(r => r.logs...)`
+                        // So I need to fetch logs here.
+                        take: 5
+                    }
                 },
                 orderBy: { created_at: 'desc' }
             })
@@ -120,8 +145,8 @@ export const getRequests = async (req: Request, res: Response): Promise<void> =>
         const enrichedData = requests.map(req => {
             let is_overdue = false;
             if (
-                req.request_type === 'PREVENTIVE' && 
-                req.scheduled_date && 
+                req.request_type === 'PREVENTIVE' &&
+                req.scheduled_date &&
                 new Date(req.scheduled_date) < today &&
                 !['Repaired', 'Scrap'].includes(req.stage.name)
             ) {
@@ -145,7 +170,7 @@ export const assignRequest = async (req: Request, res: Response): Promise<void> 
     try {
         const requestId = Number(req.params.id);
         const { technician_id } = req.body;
-        const user = (req as any).user; 
+        const user = (req as any).user;
 
         const request = await prisma.maintenanceRequest.findUnique({
             where: { id: requestId },
@@ -167,8 +192,8 @@ export const assignRequest = async (req: Request, res: Response): Promise<void> 
         }
 
         if (technician.maintenance_team_id !== request.team_id) {
-            res.status(403).json({ 
-                error: "Invalid Assignment: Technician does not belong to the assigned maintenance team." 
+            res.status(403).json({
+                error: "Invalid Assignment: Technician does not belong to the assigned maintenance team."
             });
             return;
         }
@@ -182,7 +207,7 @@ export const assignRequest = async (req: Request, res: Response): Promise<void> 
         const updatedRequest = await prisma.$transaction([
             prisma.maintenanceRequest.update({
                 where: { id: requestId },
-                data: { 
+                data: {
                     technician_id,
                     stage_id: newStageId
                 }
@@ -244,7 +269,7 @@ export const updateStatus = async (req: Request, res: Response): Promise<void> =
             await prisma.$transaction([
                 prisma.maintenanceRequest.update({
                     where: { id: requestId },
-                    data: { 
+                    data: {
                         stage_id,
                         closed_at: new Date()
                     }
@@ -264,7 +289,7 @@ export const updateStatus = async (req: Request, res: Response): Promise<void> =
                     }
                 })
             ]);
-            
+
             res.json({ message: "Equipment Scrapped and Request Closed" });
             return;
         }
@@ -289,7 +314,7 @@ export const updateStatus = async (req: Request, res: Response): Promise<void> =
             await prisma.$transaction([
                 prisma.maintenanceRequest.update({
                     where: { id: requestId },
-                    data: { 
+                    data: {
                         stage_id,
                         duration_hours: duration_hours || request.duration_hours,
                         closed_at: new Date()
@@ -311,8 +336,8 @@ export const updateStatus = async (req: Request, res: Response): Promise<void> =
 
         // Generic Stage Change
         if (currentName === 'New' && targetName === 'Repaired') {
-             res.status(400).json({ error: "Cannot jump from New to Repaired. Assign a technician first." });
-             return;
+            res.status(400).json({ error: "Cannot jump from New to Repaired. Assign a technician first." });
+            return;
         }
 
         await prisma.maintenanceRequest.update({
@@ -340,7 +365,7 @@ export const updateStatus = async (req: Request, res: Response): Promise<void> =
 export const getRequestLogs = async (req: Request, res: Response): Promise<void> => {
     try {
         const requestId = Number(req.params.id);
-        
+
         const logs = await prisma.maintenanceLog.findMany({
             where: { request_id: requestId },
             include: {
@@ -374,10 +399,23 @@ export const getCalendar = async (req: Request, res: Response): Promise<void> =>
             }
         };
 
-        if (user.role === 'TECHNICIAN' || user.role === 'MANAGER') {
+        if (user.role === 'TECHNICIAN') {
             const employee = await prisma.employee.findUnique({ where: { id: user.id } });
             if (employee?.maintenance_team_id) {
                 where.team_id = employee.maintenance_team_id;
+            }
+        }
+        else if (user.role === 'MANAGER') {
+            // Managers see calendar events from teams they manage
+            const managedTeams = await prisma.maintenanceTeam.findMany({
+                where: { manager_id: user.id },
+                select: { id: true }
+            });
+            const teamIds = managedTeams.map(t => t.id);
+            if (teamIds.length > 0) {
+                where.team_id = { in: teamIds };
+            } else {
+                where.team_id = -1; // No teams managed - return empty
             }
         }
 
@@ -426,7 +464,7 @@ export const updateRequestDetails = async (req: Request, res: Response): Promise
 
             const newDate = new Date(scheduled_date);
             const today = new Date();
-            today.setHours(0,0,0,0);
+            today.setHours(0, 0, 0, 0);
 
             if (newDate < today) {
                 res.status(400).json({ error: "Cannot reschedule to a past date." });

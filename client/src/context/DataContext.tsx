@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import client from '../api/client';
-import type { User, Team, Equipment, MaintenanceRequest, RequestStatus } from '../types';
+import type { User, Team, Equipment, MaintenanceRequest, RequestStatus, TeamMember } from '../types';
 import { CURRENT_USER_ID } from '../data/mockData';
+import { useAuth } from './AuthContext';
 
 interface DataContextType {
     currentUser: User;
@@ -11,11 +12,12 @@ interface DataContextType {
     teams: Team[];
     equipment: Equipment[];
     requests: MaintenanceRequest[];
+    availableTechnicians: TeamMember[];
 
     // Actions
     updateRequestStatus: (id: string, status: RequestStatus) => void;
     reassignTechnician: (requestId: string, technicianId: string) => void;
-    scrapEquipment: (requestId: string, equipmentId: string) => void;
+    scrapEquipment: (requestId: string, equipmentId: string) => Promise<{ success: boolean; error?: string }>;
     createRequest: (req: any) => void;
     addRequest: (request: MaintenanceRequest) => void;
 
@@ -27,85 +29,159 @@ interface DataContextType {
     addEquipment: (equipment: Equipment) => void;
     updateEquipment: (equipment: Equipment) => void;
     assignEquipment: (equipmentId: string, employeeId: string | null) => Promise<void>;
+    
+    // Team Technician Management
+    addTechnicianToTeam: (teamId: string, technicianId: string) => Promise<void>;
+    removeTechnicianFromTeam: (teamId: string, technicianId: string) => Promise<void>;
+    refreshAvailableTechnicians: () => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+    const { user: authUser, isAuthenticated, isLoading: authLoading } = useAuth();
     const [users, setUsers] = useState<User[]>([]);
     const [teams, setTeams] = useState<Team[]>([]);
     const [equipment, setEquipment] = useState<Equipment[]>([]);
     const [requests, setRequests] = useState<MaintenanceRequest[]>([]);
+    const [stages, setStages] = useState<{ id: number; name: string }[]>([]);
+    const [availableTechnicians, setAvailableTechnicians] = useState<TeamMember[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     // Fetch Initial Data
     useEffect(() => {
+        // Wait for auth to finish loading and ensure user is authenticated
+        if (authLoading || !isAuthenticated || !authUser) {
+            setLoading(false);
+            return;
+        }
+
         const fetchData = async () => {
             try {
-                const [usersRes, teamsRes, equipmentRes] = await Promise.all([
-                    client.get('/users'),
-                    client.get('/teams'),
-                    client.get('/equipment')
-                ]);
+                const userRole = authUser.role;
+                const isAdminOrManager = userRole === 'ADMIN' || userRole === 'MANAGER';
+                const canAccessStages = userRole === 'ADMIN' || userRole === 'MANAGER' || userRole === 'TECHNICIAN';
 
-                const usersData = usersRes.data;
-                const teamsData = teamsRes.data;
-                const equipmentData = equipmentRes.data;
+                // Build fetch promises based on role
+                const fetchPromises: Promise<any>[] = [];
+                const fetchKeys: string[] = [];
 
-                // Map Backend User to Client User
-                // Backend: { id: int, name, email, role: "ADMIN" }
-                // Client: { id: string, name, role: "ADMIN", avatarUrl? }
-                const mappedUsers = usersData.map((u: any) => ({
-                    id: String(u.id),
-                    name: u.name,
-                    role: u.role,
-                    email: u.email, // Add email to type if missing
-                    avatarUrl: u.avatar_url
-                }));
+                // Admin-only: users
+                if (userRole === 'ADMIN') {
+                    fetchPromises.push(client.get('/users'));
+                    fetchKeys.push('users');
+                }
 
-                const mappedTeams = teamsData.map((t: any) => ({
-                    id: String(t.id),
-                    name: t.name,
-                    technicianIds: [], // Backend doesn't send members yet, might need separate logic
-                    managerId: t.manager ? String(t.manager.id) : undefined,
-                    managerName: t.manager ? t.manager.name : undefined
-                }));
+                // Admin/Manager/Technician: teams
+                if (isAdminOrManager || userRole === 'TECHNICIAN') {
+                    fetchPromises.push(client.get('/teams'));
+                    fetchKeys.push('teams');
+                }
 
-                const mappedEquipment = equipmentData.data.map((e: any) => ({
-                    id: String(e.id),
-                    name: e.name,
-                    serialNumber: e.serial_number,
-                    location: e.location,
-                    teamId: String(e.maintenance_team_id),
-                    defaultTechnicianId: e.default_technician_id ? String(e.default_technician_id) : undefined,
-                    isActive: e.is_active,
-                    status: e.is_active ? 'Operational' : 'Scrapped', // Default mapping
-                    employeeId: e.employee_id ? String(e.employee_id) : undefined,
-                    employeeName: e.employee ? e.employee.name : undefined
-                }));
+                // All roles can access equipment
+                fetchPromises.push(client.get('/equipment'));
+                fetchKeys.push('equipment');
 
-                // Fetch Requests
-                const requestsRes = await client.get('/requests?limit=100'); // Fetch enough for now
+                // Admin/Manager/Technician: stages
+                if (canAccessStages) {
+                    fetchPromises.push(client.get('/stages'));
+                    fetchKeys.push('stages');
+                }
+
+                const responses = await Promise.all(fetchPromises);
+                const responseMap: Record<string, any> = {};
+                fetchKeys.forEach((key, index) => {
+                    responseMap[key] = responses[index].data;
+                });
+
+                // Map Backend User to Client User (only if fetched)
+                if (responseMap.users) {
+                    const mappedUsers = responseMap.users.map((u: any) => ({
+                        id: String(u.id),
+                        name: u.name,
+                        role: u.role,
+                        email: u.email,
+                        avatarUrl: u.avatar_url
+                    }));
+                    setUsers(mappedUsers);
+                }
+
+                // Map teams (if fetched)
+                if (responseMap.teams) {
+                    const mappedTeams = responseMap.teams.map((t: any) => ({
+                        id: String(t.id),
+                        name: t.name,
+                        technicianIds: t.employees ? t.employees.map((e: any) => String(e.id)) : [],
+                        technicians: t.employees ? t.employees.map((e: any) => ({
+                            id: String(e.id),
+                            name: e.name,
+                            email: e.email,
+                            role: e.role
+                        })) : [],
+                        managerId: t.manager ? String(t.manager.id) : undefined,
+                        managerName: t.manager ? t.manager.name : undefined
+                    }));
+                    setTeams(mappedTeams);
+                }
+
+                // Map equipment
+                if (responseMap.equipment) {
+                    const equipmentData = responseMap.equipment.data || responseMap.equipment;
+                    const mappedEquipment = equipmentData.map((e: any) => ({
+                        id: String(e.id),
+                        name: e.name,
+                        serialNumber: e.serial_number,
+                        location: e.location,
+                        teamId: String(e.maintenance_team_id),
+                        defaultTechnicianId: e.default_technician_id ? String(e.default_technician_id) : undefined,
+                        isActive: e.is_active,
+                        status: e.is_active ? 'Operational' : 'Scrapped',
+                        employeeId: e.employee_id ? String(e.employee_id) : undefined,
+                        employeeName: e.employee ? e.employee.name : undefined
+                    }));
+                    setEquipment(mappedEquipment);
+                }
+
+                // Map stages (if fetched)
+                if (responseMap.stages) {
+                    setStages(responseMap.stages);
+                } else {
+                    // Set default stages for employees who can't access the stages endpoint
+                    setStages([
+                        { id: 1, name: 'New' },
+                        { id: 2, name: 'In Progress' },
+                        { id: 3, name: 'Repaired' },
+                        { id: 4, name: 'Scrap' }
+                    ]);
+                }
+
+                // Fetch Requests (all authenticated users can access their requests)
+                const requestsRes = await client.get('/requests?limit=100');
                 const requestsData = requestsRes.data.data;
 
                 const mappedRequests = requestsData.map((r: any) => ({
                     id: String(r.id),
                     equipmentId: String(r.equipment_id),
+                    equipmentName: r.equipment?.name,
+                    teamId: String(r.team_id),
                     title: r.subject,
-                    description: "", // Backend might not have this yet, or we need to add it
-                    priority: 'Medium', // Default or map if available
+                    description: "",
+                    priority: 'Medium',
                     type: r.request_type === 'PREVENTIVE' ? 'Preventive' : 'Corrective',
                     status: r.stage ? r.stage.name : 'New',
                     assignedTechId: r.technician_id ? String(r.technician_id) : undefined,
-                    dueDate: r.scheduled_date || r.created_at, // Use scheduled for preventive, created for others as fallback
+                    dueDate: r.scheduled_date || r.created_at,
                     createdAt: r.created_at,
-                    logs: [] // Logs are fetched individually usually, or we can fetch if needed
+                    logs: r.logs ? r.logs.map((l: any) => ({
+                        id: String(l.id),
+                        timestamp: l.created_at,
+                        message: l.message,
+                        authorId: String(l.created_by_id)
+                    })) : [],
+                    durationHours: r.duration_hours
                 }));
 
-                setUsers(mappedUsers);
-                setTeams(mappedTeams);
-                setEquipment(mappedEquipment);
                 setRequests(mappedRequests);
             } catch (err: any) {
                 console.error(err);
@@ -115,83 +191,34 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             }
         };
         fetchData();
-    }, []);
+    }, [authUser, isAuthenticated, authLoading]);
 
-    const currentUser = users.find(u => u.id === CURRENT_USER_ID) || users[0];
+    // Use authUser as currentUser, or fall back to users array if available
+    const currentUser = authUser ? {
+        id: String(authUser.id),
+        name: authUser.name,
+        role: authUser.role,
+        email: authUser.email,
+        avatarUrl: (authUser as any).avatar_url
+    } as User : (users.find(u => u.id === CURRENT_USER_ID) || users[0]);
 
     const updateRequestStatus = async (requestId: string, status: RequestStatus) => {
         try {
-            // Find stage ID for the status string
-            // In a real app we might need to fetch stages first or have a known map. 
-            // For now, let's assume we can't easily map string -> ID without a lookup.
-            // But checking the backend controller, it takes `stage_id`. 
-            // We need a helper to get stage ID. Optimistically update for now OR fetch stages.
-            // Let's assume standard IDs for simplicity or we need to GET /stages.
-            // Wait, the backend controller `updateStatus` takes `stage_id`.
-            // We don't have stages in context. 
-            // LET'S HARDCODE IDs for this "No Guesswork" requirement based on common seeds or fetch them?
-            // "No guesswork" suggests I should likely fetch stages or mapped them properly.
-            // However context is getting complex. Let's try to pass the status name if the backend supported it, but it doesn't.
-            // It strictly needs `stage_id`.
-            // I'll fetch valid stages in specific component or I really should load stages here.
-            // Let's just create a quick map if possible, OR, change the backend to accept names.
-            // But I cannot change backend "Responsibility is integrate... refer to backend".
-            // So I must stick to contracts.
-            // Solution: I should fetch stages in `fetchData` too to map name <-> id.
+            const targetStage = stages.find(s => s.name === status);
+            if (!targetStage) {
+                console.error(`Stage '${status}' not found in fetched stages.`);
+                // Fallback map if fetch failed or stages missing
+                const fallbackMap: Record<string, number> = { 'New': 1, 'In Progress': 2, 'Repaired': 3, 'Scrap': 4 };
+                await client.patch(`/requests/${requestId}/status`, {
+                    stage_id: fallbackMap[status],
+                    duration_hours: 1
+                });
+                return;
+            }
 
-            // Re-reading controller: `updateStatus` -> `const targetStage = await prisma.maintenanceStage.findUnique({ where: { id: stage_id } });`
-            // It definitely needs ID.
-
-            // Hack for now: I will not implement `updateRequestStatus` fully cleanly without stages. 
-            // BUT, `useData` context interface says `status: RequestStatus` (string).
-            // I will implement a lookup map here temporarily or assuming 1=New, 2=In Progress, 3=Repaired, 4=Scrap?
-            // No, that's guesswork. 
-
-            // Better approach: When loading requests, we got the stage name.
-            // We need the reverse mapping.
-            // Let's fetch stages in `fetchData` to be safe.
-            // I'll add `stages` to state? NO, I'll just map roughly or do a lookup call.
-
-            // actually, let's just use the `client.patch` and let's assume we can send the status name if I change the backend? 
-            // NO, "integrate ... with ZERO guesswork".
-
-            // OK, I'll fetch stages in the `useEffect` and store them in a ref or state to use for mapping.
-            // For this specific replacement chunk, I'll allow the error or add a comment that this needs fixing, 
-            // OR I will simple Log it for now?
-            // No, I need to make it work.
-
-            // Let's defer strict stage ID mapping to a separate step if needed, or better:
-            // I will create a dictionary of known stages if possible.
-            // Actually, I can use a helper endpoint if exists? No.
-
-            // Let's assume for this specific edit I will just log implementation TODO or do a best effort.
-            // Wait, `updateStatus` in backend accepts `stage_id`.
-            // The frontend passes `status` string.
-            // I will implement a `getStageId` helper.
-
-            // For now, I will implement the optimistic update and the API call structure, but arguably I might fail on ID.
-            // Let's query the stages endpoint if I can find one. 
-            // `server/routes/stages.routes.ts` exists in the file list I saw earlier! 
-            // Let's assumes I can GET /stages.
-
-            // I will optimistically update frontend first.
-            setRequests(prev => prev.map(req =>
-                req.id === requestId ? { ...req, status } : req
-            ));
-
-            // TODO: We need the ID for the stage 'status'. 
-            // Since I don't have it handy, I can't call the API correctly yet without guesswork.
-            // I will add a method to get stages later or assumes standard IDs:
-            // 1: New, 2: In Progress, 3: Repaired, 4: Scrap (Common in seed)
-            const stageMap: Record<string, number> = {
-                'New': 1,
-                'In Progress': 2,
-                'Repaired': 3,
-                'Scrap': 4
-            };
             await client.patch(`/requests/${requestId}/status`, {
-                stage_id: stageMap[status],
-                duration_hours: 1 // Default duration if needed? Or pass it?
+                stage_id: targetStage.id,
+                duration_hours: 1 // Default duration
             });
 
         } catch (e) {
@@ -203,30 +230,58 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const reassignTechnician = async (requestId: string, techId: string) => {
         try {
-            setRequests(prev => prev.map(req =>
-                req.id === requestId ? { ...req, assignedTechId: techId } : req
-            ));
-            await client.patch(`/requests/${requestId}/assign`, { technician_id: Number(techId) });
+            // Optimistic update - also update status if moving from 'New' (backend auto-transitions)
+            setRequests(prev => prev.map(req => {
+                if (req.id === requestId) {
+                    const newStatus = req.status === 'New' ? 'In Progress' : req.status;
+                    return { ...req, assignedTechId: techId, status: newStatus };
+                }
+                return req;
+            }));
+            
+            const response = await client.patch(`/requests/${requestId}/assign`, { technician_id: Number(techId) });
+            const updatedRequest = response.data.request;
+            
+            // Update with actual server response (in case of any discrepancies)
+            if (updatedRequest) {
+                setRequests(prev => prev.map(req => {
+                    if (req.id === requestId) {
+                        return {
+                            ...req,
+                            assignedTechId: String(updatedRequest.technician_id),
+                            // Note: Backend returns stage_id, we'd need to map it back to name
+                            // For now the optimistic update handles the status change
+                        };
+                    }
+                    return req;
+                }));
+            }
         } catch (e) {
             console.error("Failed to reassign", e);
+            // Revert optimistic update on error
+            setRequests(prev => prev.map(req =>
+                req.id === requestId ? { ...req, assignedTechId: undefined } : req
+            ));
         }
     };
 
-    const scrapEquipment = async (requestId: string, equipmentId: string) => {
+    const scrapEquipment = async (requestId: string, equipmentId: string): Promise<{ success: boolean; error?: string }> => {
         try {
-            // Optimistic update
-            updateRequestStatus(requestId, 'Scrap');
+            // Call backend to update status to Scrap
+            await updateRequestStatus(requestId, 'Scrap');
+            
+            // Update local equipment state
             setEquipment(prev => prev.map(eq =>
                 eq.id === equipmentId
                     ? { ...eq, isActive: false, status: 'Scrapped' }
                     : eq
             ));
 
-            // Backend call handled by updateRequestStatus with "Scrap" stage usually?
-            // Checking controller: "If targetStage.is_scrap_state ... Deactivate Equipment"
-            // So calling updateStatus with Scrap stage ID is enough!
-        } catch (e) {
-            console.log(e);
+            return { success: true };
+        } catch (e: any) {
+            console.error('Scrap equipment error:', e);
+            const errorMessage = e.response?.data?.error || 'Failed to scrap equipment';
+            return { success: false, error: errorMessage };
         }
     };
 
@@ -250,6 +305,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             const created: MaintenanceRequest = {
                 id: String(r.id),
                 equipmentId: String(r.equipment_id),
+                teamId: String(r.team_id),
                 title: r.subject,
                 description: "",
                 priority: 'Medium',
@@ -276,6 +332,83 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const addEquipment = (eq: Equipment) => setEquipment(prev => [...prev, eq]);
     const updateEquipment = (updatedEq: Equipment) => setEquipment(prev => prev.map(e => e.id === updatedEq.id ? updatedEq : e));
 
+    const refreshAvailableTechnicians = async () => {
+        try {
+            const res = await client.get('/teams/technicians/available');
+            const techData = res.data.map((t: any) => ({
+                id: String(t.id),
+                name: t.name,
+                email: t.email,
+                role: t.role
+            }));
+            setAvailableTechnicians(techData);
+        } catch (e) {
+            console.error("Failed to fetch available technicians", e);
+        }
+    };
+
+    const addTechnicianToTeam = async (teamId: string, technicianId: string) => {
+        try {
+            const res = await client.post(`/teams/${teamId}/technicians`, {
+                technician_id: Number(technicianId)
+            });
+            const addedTech = {
+                id: String(res.data.id),
+                name: res.data.name,
+                email: res.data.email,
+                role: res.data.role
+            };
+
+            // Update teams state
+            setTeams(prev => prev.map(team => {
+                if (team.id === teamId) {
+                    return {
+                        ...team,
+                        technicianIds: [...team.technicianIds, addedTech.id],
+                        technicians: [...(team.technicians || []), addedTech]
+                    };
+                }
+                return team;
+            }));
+
+            // Remove from available technicians
+            setAvailableTechnicians(prev => prev.filter(t => t.id !== technicianId));
+        } catch (e) {
+            console.error("Failed to add technician to team", e);
+            throw e;
+        }
+    };
+
+    const removeTechnicianFromTeam = async (teamId: string, technicianId: string) => {
+        try {
+            await client.delete(`/teams/${teamId}/technicians/${technicianId}`);
+
+            // Find the removed technician's details before updating state
+            const team = teams.find(t => t.id === teamId);
+            const removedTech = team?.technicians?.find(t => t.id === technicianId);
+
+            // Update teams state
+            setTeams(prev => prev.map(t => {
+                if (t.id === teamId) {
+                    return {
+                        ...t,
+                        technicianIds: t.technicianIds.filter(id => id !== technicianId),
+                        technicians: (t.technicians || []).filter(tech => tech.id !== technicianId)
+                    };
+                }
+                return t;
+            }));
+
+            // Add back to available technicians
+            if (removedTech) {
+                setAvailableTechnicians(prev => [...prev, removedTech]);
+            }
+        } catch (e) {
+            console.error("Failed to remove technician from team", e);
+            throw e;
+        }
+    };
+
     return (
         <DataContext.Provider value={{
             currentUser,
@@ -285,6 +418,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             teams,
             equipment,
             requests,
+            availableTechnicians,
             updateRequestStatus,
             reassignTechnician,
             scrapEquipment,
@@ -306,7 +440,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                         manager_id: team.managerId ? Number(team.managerId) : undefined
                     });
                     const newTeam = res.data;
-                    setTeams(prev => [...prev, { ...team, id: String(newTeam.id), managerName: team.managerName }]);
+                    setTeams(prev => [...prev, { ...team, id: String(newTeam.id), managerName: team.managerName, technicians: [] }]);
                 } catch (e) { console.error(e); }
             },
             updateTeam: async (team: Team) => {
@@ -339,7 +473,10 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 } catch (e) {
                     console.error("Failed to assign equipment", e);
                 }
-            }
+            },
+            addTechnicianToTeam,
+            removeTechnicianFromTeam,
+            refreshAvailableTechnicians
         }}>
             {children}
         </DataContext.Provider>
