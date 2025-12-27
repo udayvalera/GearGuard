@@ -8,9 +8,111 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// --------------------------------------
-// 1. Enums
-// --------------------------------------
+model Department {
+  id        Int         @id @default(autoincrement())
+  name      String      @unique
+  equipment Equipment[]
+}
+
+model MaintenanceTeam {
+  id        Int                  @id @default(autoincrement())
+  name      String               @unique
+  employees Employee[]
+  equipment Equipment[]
+  requests  MaintenanceRequest[]
+}
+
+model Employee {
+  id                  Int                  @id @default(autoincrement())
+  name                String
+  email               String               @unique
+  password            String
+  role                Role                 @default(EMPLOYEE)
+  avatar_url          String?
+  maintenance_team_id Int?
+  maintenance_team    MaintenanceTeam?     @relation(fields: [maintenance_team_id], references: [id])
+  default_for_equip   Equipment[]          @relation("DefaultTechnician")
+  owned_equipment     Equipment[]          @relation("EquipmentOwner")
+  audit_logs          MaintenanceLog[]     @relation("LogAuthor")
+  created_requests    MaintenanceRequest[] @relation("CreatedBy")
+  assigned_requests   MaintenanceRequest[] @relation("AssignedTechnician")
+}
+
+model EquipmentCategory {
+  id        Int         @id @default(autoincrement())
+  name      String      @unique
+  equipment Equipment[]
+}
+
+model Equipment {
+  id                    Int                  @id @default(autoincrement())
+  name                  String
+  serial_number         String               @unique
+  purchase_date         DateTime?
+  warranty_info         String?
+  location              String
+  is_active             Boolean              @default(true)
+  department_id         Int?
+  category_id           Int
+  employee_id           Int?
+  maintenance_team_id   Int
+  default_technician_id Int?
+  created_at            DateTime             @default(now())
+  updated_at            DateTime             @updatedAt
+  category              EquipmentCategory    @relation(fields: [category_id], references: [id])
+  default_technician    Employee?            @relation("DefaultTechnician", fields: [default_technician_id], references: [id])
+  department            Department?          @relation(fields: [department_id], references: [id])
+  employee              Employee?            @relation("EquipmentOwner", fields: [employee_id], references: [id])
+  maintenance_team      MaintenanceTeam      @relation(fields: [maintenance_team_id], references: [id])
+  logs                  MaintenanceLog[]
+  maintenance_requests  MaintenanceRequest[]
+}
+
+model MaintenanceStage {
+  id             Int                  @id @default(autoincrement())
+  name           String               @unique
+  sequence       Int
+  is_scrap_state Boolean              @default(false)
+  requests       MaintenanceRequest[]
+}
+
+model MaintenanceRequest {
+  id             Int              @id @default(autoincrement())
+  subject        String
+  request_type   RequestType
+  scheduled_date DateTime?
+  duration_hours Float?
+  created_at     DateTime         @default(now())
+  closed_at      DateTime?
+  updated_at     DateTime         @updatedAt
+  created_by_id  Int
+  equipment_id   Int
+  team_id        Int
+  technician_id  Int?
+  stage_id       Int
+  logs           MaintenanceLog[]
+  created_by     Employee         @relation("CreatedBy", fields: [created_by_id], references: [id])
+  equipment      Equipment        @relation(fields: [equipment_id], references: [id])
+  stage          MaintenanceStage @relation(fields: [stage_id], references: [id])
+  team           MaintenanceTeam  @relation(fields: [team_id], references: [id])
+  technician     Employee?        @relation("AssignedTechnician", fields: [technician_id], references: [id])
+
+  @@index([scheduled_date])
+  @@index([stage_id])
+  @@index([team_id])
+}
+
+model MaintenanceLog {
+  id            Int                 @id @default(autoincrement())
+  message       String
+  created_at    DateTime            @default(now())
+  request_id    Int?
+  equipment_id  Int?
+  created_by_id Int?
+  created_by    Employee?           @relation("LogAuthor", fields: [created_by_id], references: [id])
+  equipment     Equipment?          @relation(fields: [equipment_id], references: [id])
+  request       MaintenanceRequest? @relation(fields: [request_id], references: [id])
+}
 
 enum Role {
   EMPLOYEE
@@ -22,149 +124,4 @@ enum Role {
 enum RequestType {
   CORRECTIVE
   PREVENTIVE
-}
-
-// --------------------------------------
-// 2. Organization & Personnel
-// --------------------------------------
-
-model Department {
-  id        Int         @id @default(autoincrement())
-  name      String      @unique
-  equipment Equipment[]
-}
-
-model MaintenanceTeam {
-  id        Int         @id @default(autoincrement())
-  name      String      @unique
-  employees Employee[]
-  equipment Equipment[]
-  requests  MaintenanceRequest[]
-}
-
-model Employee {
-  id                  Int       @id @default(autoincrement())
-  name                String
-  email               String    @unique
-  password            String
-  role                Role      @default(EMPLOYEE)
-  avatar_url          String?
-  
-  maintenance_team_id Int?
-  maintenance_team    MaintenanceTeam? @relation(fields: [maintenance_team_id], references: [id])
-
-  owned_equipment     Equipment[]          @relation("EquipmentOwner")
-  default_for_equip   Equipment[]          @relation("DefaultTechnician")
-  
-  created_requests    MaintenanceRequest[] @relation("CreatedBy")
-  assigned_requests   MaintenanceRequest[] @relation("AssignedTechnician")
-  
-  audit_logs          MaintenanceLog[]     @relation("LogAuthor")
-}
-
-// --------------------------------------
-// 3. Equipment Assets
-// --------------------------------------
-
-model EquipmentCategory {
-  id        Int         @id @default(autoincrement())
-  name      String      @unique
-  equipment Equipment[]
-}
-
-model Equipment {
-  id                    Int       @id @default(autoincrement())
-  name                  String
-  serial_number         String    @unique // 1.2 Constraint: Unique Index
-  purchase_date         DateTime?
-  warranty_info         String?
-  location              String
-  is_active             Boolean   @default(true)
-  
-  department_id         Int?
-  department            Department? @relation(fields: [department_id], references: [id])
-
-  category_id           Int
-  category              EquipmentCategory @relation(fields: [category_id], references: [id])
-
-  employee_id           Int?
-  employee              Employee? @relation("EquipmentOwner", fields: [employee_id], references: [id])
-
-  maintenance_team_id   Int
-  maintenance_team      MaintenanceTeam @relation(fields: [maintenance_team_id], references: [id])
-
-  default_technician_id Int?
-  default_technician    Employee? @relation("DefaultTechnician", fields: [default_technician_id], references: [id])
-
-  created_at            DateTime  @default(now())
-  updated_at            DateTime  @updatedAt
-
-  maintenance_requests  MaintenanceRequest[]
-  logs                  MaintenanceLog[]
-}
-
-// --------------------------------------
-// 4. Maintenance Engine
-// --------------------------------------
-
-model MaintenanceStage {
-  id             Int      @id @default(autoincrement())
-  name           String   @unique
-  sequence       Int
-  is_scrap_state Boolean  @default(false)
-
-  requests       MaintenanceRequest[]
-}
-
-model MaintenanceRequest {
-  id             Int         @id @default(autoincrement())
-  subject        String
-  request_type   RequestType
-  scheduled_date DateTime?
-  duration_hours Float?
-  
-  created_at     DateTime    @default(now())
-  closed_at      DateTime?
-  updated_at     DateTime    @updatedAt
-
-  created_by_id  Int
-  created_by     Employee    @relation("CreatedBy", fields: [created_by_id], references: [id])
-
-  equipment_id   Int
-  equipment      Equipment   @relation(fields: [equipment_id], references: [id])
-
-  team_id        Int
-  team           MaintenanceTeam @relation(fields: [team_id], references: [id])
-
-  technician_id  Int?
-  technician     Employee?   @relation("AssignedTechnician", fields: [technician_id], references: [id])
-
-  stage_id       Int
-  stage          MaintenanceStage @relation(fields: [stage_id], references: [id])
-
-  logs           MaintenanceLog[]
-
-  // 1.2 Constraints & Indexes: Performance Indexes
-  @@index([scheduled_date])
-  @@index([stage_id])
-  @@index([team_id])
-}
-
-// --------------------------------------
-// 5. Audit & History
-// --------------------------------------
-
-model MaintenanceLog {
-  id            Int      @id @default(autoincrement())
-  message       String
-  created_at    DateTime @default(now())
-
-  request_id    Int?
-  request       MaintenanceRequest? @relation(fields: [request_id], references: [id])
-
-  equipment_id  Int?
-  equipment     Equipment? @relation(fields: [equipment_id], references: [id])
-  
-  created_by_id Int?
-  created_by    Employee? @relation("LogAuthor", fields: [created_by_id], references: [id])
 }
