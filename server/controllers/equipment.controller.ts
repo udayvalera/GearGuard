@@ -3,9 +3,12 @@ import { PrismaClient, Role } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-// 3.1 Create Equipment
+// 3.1 Create Equipment (M6.1 Manager Enforcement)
 export const createEquipment = async (req: Request, res: Response): Promise<void> => {
     try {
+        // FIX: Extract user here so it is available for validation
+        const user = (req as any).user;
+        
         const { 
             name, serial_number, location, category_id, 
             maintenance_team_id, default_technician_id, department_id, employee_id 
@@ -15,6 +18,16 @@ export const createEquipment = async (req: Request, res: Response): Promise<void
         if (!name || !serial_number || !maintenance_team_id || !category_id) {
             res.status(400).json({ error: "Missing required fields" });
             return;
+        }
+
+        // M6.1: Manager Team Enforcement
+        // Manager can only create equipment for THEIR team
+        if (user.role === 'MANAGER') {
+            const emp = await prisma.employee.findUnique({ where: { id: user.id } });
+            if (!emp || emp.maintenance_team_id !== maintenance_team_id) {
+                res.status(403).json({ error: "Managers can only create equipment for their own maintenance team." });
+                return;
+            }
         }
 
         // Validate Technician belongs to Team

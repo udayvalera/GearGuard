@@ -274,7 +274,15 @@ export const updateStatus = async (req: Request, res: Response): Promise<void> =
             return;
         }
 
+        
         if (targetName === 'Repaired') {
+            // M5.2: Managers cannot log duration/repair (Technician role only)
+            if (user.role === 'MANAGER') {
+                res.status(403).json({ error: "Managers cannot mark requests as Repaired. Only Technicians can complete work." });
+                return;
+            }
+
+            if (!duration_hours && !request.duration_hours) {
             if (!duration_hours && !request.duration_hours) {
                 res.status(400).json({ error: "Duration (hours) is required when marking as Repaired" });
                 return;
@@ -328,7 +336,7 @@ export const updateStatus = async (req: Request, res: Response): Promise<void> =
         });
 
         res.json({ message: "Status updated" });
-    } catch (error) {
+    }} catch (error) {
         console.error("Update Status Error:", error);
         res.status(500).json({ error: "Internal Server Error" });
     }
