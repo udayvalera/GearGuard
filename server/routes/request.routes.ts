@@ -1,10 +1,13 @@
 import { Router } from "express";
-import { createRequest, getRequests , assignRequest , updateStatus } from "../controllers/request.controller.js";
+import { createRequest, getRequests , assignRequest , updateStatus , getCalendar } from "../controllers/request.controller.js";
 import { authenticate } from "../middleware/auth.middleware.js";
 
 const router = Router();
 
 router.use(authenticate());
+// 7.1 Calendar View
+router.get("/calendar", getCalendar);
+
 
 // 4.1 Create Request (Any authenticated user can request maintenance)
 router.post("/", createRequest);

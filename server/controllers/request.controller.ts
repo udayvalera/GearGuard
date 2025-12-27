@@ -293,3 +293,57 @@ export const updateStatus = async (req: Request, res: Response): Promise<void> =
     }
 };
 
+
+// 7.1 Calendar View (Preventive Only)
+export const getCalendar = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const user = (req as any).user;
+        const { start, end } = req.query;
+
+        if (!start || !end) {
+            res.status(400).json({ error: "Start and End dates are required (YYYY-MM-DD)" });
+            return;
+        }
+
+        // Base Filter: Preventive + Date Range
+        const where: any = {
+            request_type: 'PREVENTIVE',
+            scheduled_date: {
+                gte: new Date(String(start)),
+                lte: new Date(String(end))
+            }
+        };
+
+        // Role-Based Visibility
+        if (user.role === 'TECHNICIAN') {
+            const employee = await prisma.employee.findUnique({ where: { id: user.id } });
+            if (employee?.maintenance_team_id) {
+                where.team_id = employee.maintenance_team_id;
+            }
+        }
+        // Employees usually don't see the maintenance calendar, 
+        // but if they do, maybe restrict to equipment they own? 
+        // For now, we'll keep it open for Employees to see schedule (or block it).
+        // Managers/Admins see all.
+
+        const events = await prisma.maintenanceRequest.findMany({
+            where,
+            select: {
+                id: true,
+                subject: true,
+                scheduled_date: true,
+                stage: { select: { name: true } },
+                equipment: { select: { name: true, location: true } },
+                technician: { select: { name: true } }
+            },
+            orderBy: { scheduled_date: 'asc' }
+        });
+
+        res.json(events);
+
+    } catch (error) {
+        console.error("Calendar Error:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+
