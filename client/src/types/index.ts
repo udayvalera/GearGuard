@@ -12,6 +12,8 @@ export interface Team {
     id: string;
     name: string;
     technicianIds: string[];
+    managerId?: string;
+    managerName?: string;
 }
 
 export type EquipmentStatus = 'Operational' | 'Scrapped' | 'Under Maintenance';

@@ -48,8 +48,7 @@ const TeamsPage = () => {
                         </div>
                         <h3 className="text-lg font-bold text-[var(--color-text-primary)] mb-1">{team.name}</h3>
                         <p className="text-sm text-[var(--color-text-secondary)] mb-4">
-                            {/* @ts-ignore */}
-                            Lead: {team.lead || 'Unassigned'}
+                            Manager: {team.managerName || 'Unassigned'}
                         </p>
 
                         <div className="flex items-center gap-2 text-sm text-[var(--color-text-tertiary)] border-t border-[var(--color-border-200)] pt-4">
