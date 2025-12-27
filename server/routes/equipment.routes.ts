@@ -55,7 +55,20 @@ router.use(authenticate());
  *                 type: integer
  *     responses:
  *       201:
- *         description: Equipment created
+ *         description: Equipment created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: integer
+ *                 name:
+ *                   type: string
+ *                 serial_number:
+ *                   type: string
+ *                 is_active:
+ *                   type: boolean
  *       403:
  *         description: Manager attempted to create equipment for a different team
  *       409:
@@ -89,6 +102,43 @@ router.post("/", authenticate(["ADMIN", "MANAGER"]), createEquipment);
  *     responses:
  *       200:
  *         description: List of equipment
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                       name:
+ *                         type: string
+ *                       serial_number:
+ *                         type: string
+ *                       category:
+ *                         type: object
+ *                         properties:
+ *                           name:
+ *                             type: string
+ *                       maintenance_team:
+ *                         type: object
+ *                         properties:
+ *                           name:
+ *                             type: string
+ *                 meta:
+ *                   type: object
+ *                   properties:
+ *                     total:
+ *                       type: integer
+ *                     page:
+ *                       type: integer
+ *                     limit:
+ *                       type: integer
+ *                     totalPages:
+ *                       type: integer
  */
 router.get("/", getEquipment);
 
@@ -108,7 +158,21 @@ router.get("/", getEquipment);
  *           type: integer
  *     responses:
  *       200:
- *         description: Equipment maintenance stats (open requests, status)
+ *         description: Equipment maintenance stats
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 equipment_id:
+ *                   type: integer
+ *                 total_requests:
+ *                   type: integer
+ *                 open_requests:
+ *                   type: integer
+ *                 status:
+ *                   type: string
+ *                   example: Maintenance Required
  *       404:
  *         description: Equipment not found
  */
@@ -131,6 +195,27 @@ router.get("/:id/stats", getEquipmentStats);
  *     responses:
  *       200:
  *         description: List of maintenance requests
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   id:
+ *                     type: integer
+ *                   subject:
+ *                     type: string
+ *                   status:
+ *                     type: string
+ *                   created_at:
+ *                     type: string
+ *                     format: date-time
+ *                   stage:
+ *                     type: object
+ *                     properties:
+ *                       name:
+ *                         type: string
  *       404:
  *         description: Equipment not found
  */
