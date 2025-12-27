@@ -18,7 +18,7 @@ export const getMaintenanceStages = async (
       orderBy: { sequence: "asc" },
     });
 
-    res.json(stages.map(stage => stage.name));
+    res.json(stages);
   } catch (error) {
     console.error("Get Stages Error:", error);
     res.status(500).json({ error: "Internal Server Error" });

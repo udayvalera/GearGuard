@@ -6,17 +6,37 @@ import { Badge } from '../../components/design-system/Badge';
 import { Card } from '../../components/design-system/Card';
 
 const Reports = () => {
-    const { users, requests } = useData();
-    const technicians = users.filter(u => u.role === 'TECHNICIAN');
+    const { teams, requests } = useData();
+    
+    // Derive technicians from teams data (managers have access to teams, not full users list)
+    const technicians = useMemo(() => {
+        const allTechs: { id: string; name: string; email: string; avatarUrl?: string }[] = [];
+        teams.forEach(team => {
+            if (team.technicians) {
+                team.technicians.forEach(tech => {
+                    if (!allTechs.find(t => t.id === tech.id)) {
+                        allTechs.push({ 
+                            id: tech.id, 
+                            name: tech.name, 
+                            email: tech.email,
+                            avatarUrl: undefined // Teams data doesn't include avatar
+                        });
+                    }
+                });
+            }
+        });
+        return allTechs;
+    }, [teams]);
 
     const reportData = useMemo(() => {
         return technicians.map(tech => {
             const techRequests = requests.filter(r => r.assignedTechId === tech.id);
             const activeCount = techRequests.filter(r => r.status === 'New' || r.status === 'In Progress').length;
-            const completedCount = techRequests.filter(r => r.status === 'Repaired').length;
+            const completedRequests = techRequests.filter(r => r.status === 'Repaired');
+            const completedCount = completedRequests.length;
 
-            const seed = tech.id.charCodeAt(tech.id.length - 1);
-            const avgResolutionTime = 2.5 + (seed % 5) / 2;
+            const totalHours = completedRequests.reduce((sum, r) => sum + (r.durationHours || 0), 0);
+            const avgResolutionTime = completedCount > 0 ? totalHours / completedCount : 0;
 
             return {
                 ...tech,

@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { LayoutDashboard, Kanban, Calendar, BarChart3, ShieldCheck, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, Kanban, Calendar, BarChart3, ShieldCheck, ChevronLeft, ChevronRight, LogOut } from 'lucide-react';
 import { clsx } from 'clsx';
 import { Button } from './Button';
 
@@ -26,7 +26,7 @@ const SidebarItem = ({ to, icon: Icon, label, collapsed }: { to: string; icon: a
 
 export const Sidebar = () => {
     const [collapsed, setCollapsed] = React.useState(false);
-    const { user } = useAuth();
+    const { user, logout } = useAuth();
 
     // Default to 'guest' or null if no user, preventing crash
     const currentRole = user?.role || null;
@@ -88,16 +88,43 @@ export const Sidebar = () => {
                 )}
             </nav>
 
-            <div className="p-4 border-t border-[var(--color-border-200)] flex justify-end">
+            <div className="p-4 border-t border-[var(--color-border-200)] flex items-center justify-between">
                 <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setCollapsed(!collapsed)}
-                    className="text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)]"
+                    onClick={logout}
+                    className={clsx(
+                        "text-[var(--color-text-tertiary)] hover:text-red-600 hover:bg-red-50",
+                        collapsed && "mx-auto"
+                    )}
+                    title={collapsed ? "Logout" : undefined}
                 >
-                    {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+                    <LogOut size={16} />
+                    {!collapsed && <span className="ml-2">Logout</span>}
                 </Button>
+                {!collapsed && (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setCollapsed(!collapsed)}
+                        className="text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)]"
+                    >
+                        <ChevronLeft size={16} />
+                    </Button>
+                )}
             </div>
+            {collapsed && (
+                <div className="p-2 border-t border-[var(--color-border-200)] flex justify-center">
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setCollapsed(!collapsed)}
+                        className="text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)]"
+                    >
+                        <ChevronRight size={16} />
+                    </Button>
+                </div>
+            )}
         </aside>
     );
 };

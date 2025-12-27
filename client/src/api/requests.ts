@@ -47,7 +47,7 @@ const mapRequestDTOtoModel = (dto: RequestDTO): MaintenanceRequest => {
             id: String(log.id),
             timestamp: log.created_at,
             message: log.message,
-            authorId: log.created_by.name // Using name as authorId for display simplicity or need mapped ID
+            authorId: log.created_by?.name || 'Unknown' // Safe access for created_by
         })) : []
     };
 };
@@ -91,6 +91,6 @@ export const fetchRequestLogs = async (id: string) => {
         id: String(log.id),
         timestamp: log.created_at,
         message: log.message,
-        authorId: log.created_by.name
+        authorId: log.created_by?.name || 'Unknown'
     }));
 };
