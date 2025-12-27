@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    container_name: gearguard-api
+    restart: always
+    ports:
+      - "5000:5000"
+    env_file:
+      - .env  # Injects your Supabase URL and JWT Secret automatically
+    environment:
+      - PORT=5000
+    networks:
+      - gearguard-network
+
+networks:
+  gearguard-network:
+    driver: bridge
