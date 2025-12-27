@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { signup, login, logout, getMe } from "../controllers/auth.controller.js";
 import { authenticate } from "../middleware/auth.middleware.js";
+import { validate } from "../middleware/validate.middleware.js";
+import { signupSchema, loginSchema } from "../schemas/auth.schema.js";
 
 const router = Router();
 
@@ -58,8 +60,7 @@ const router = Router();
  *       400:
  *         description: User already exists
  */
-router.post("/signup", signup);
-
+router.post("/signup", validate(signupSchema), signup);
 /**
  * @swagger
  * /auth/login:
@@ -107,8 +108,7 @@ router.post("/signup", signup);
  *       401:
  *         description: Invalid credentials
  */
-router.post("/login", login);
-
+router.post("/login", validate(loginSchema), login);
 /**
  * @swagger
  * /auth/logout:

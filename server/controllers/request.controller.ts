@@ -9,26 +9,6 @@ export const createRequest = async (req: Request, res: Response): Promise<void> 
         const user = (req as any).user;
         const { subject, request_type, scheduled_date, equipment_id, duration_hours } = req.body;
 
-        if (!subject || !request_type || !equipment_id) {
-            res.status(400).json({ error: "Missing required fields: subject, request_type, equipment_id" });
-            return;
-        }
-
-        // M2.2: Validate Preventive Date (Manager Planning)
-        if (request_type === RequestType.PREVENTIVE) {
-            if (!scheduled_date) {
-                res.status(400).json({ error: "Scheduled date is mandatory for Preventive requests" });
-                return;
-            }
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const scheduled = new Date(scheduled_date);
-
-            if (scheduled < today) {
-                res.status(400).json({ error: "Cannot schedule Preventive Maintenance in the past." });
-                return;
-            }
-        }
 
         const equipment = await prisma.equipment.findUnique({
             where: { id: equipment_id },
@@ -167,11 +147,6 @@ export const assignRequest = async (req: Request, res: Response): Promise<void> 
         const { technician_id } = req.body;
         const user = (req as any).user; 
 
-        if (!technician_id) {
-            res.status(400).json({ error: "Technician ID is required" });
-            return;
-        }
-
         const request = await prisma.maintenanceRequest.findUnique({
             where: { id: requestId },
             include: { stage: true }
@@ -236,11 +211,6 @@ export const updateStatus = async (req: Request, res: Response): Promise<void> =
         const requestId = Number(req.params.id);
         const { stage_id, duration_hours } = req.body;
         const user = (req as any).user;
-
-        if (!stage_id) {
-            res.status(400).json({ error: "Stage ID is required" });
-            return;
-        }
 
         const request = await prisma.maintenanceRequest.findUnique({
             where: { id: requestId },

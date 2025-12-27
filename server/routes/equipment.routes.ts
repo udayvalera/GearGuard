@@ -1,3 +1,5 @@
+import { validate } from "../middleware/validate.middleware.js";
+import { createEquipmentSchema } from "../schemas/equipment.schema.js";
 import { Router } from "express";
 import {
   createEquipment,
@@ -74,7 +76,7 @@ router.use(authenticate());
  *       409:
  *         description: Serial number conflict
  */
-router.post("/", authenticate(["ADMIN", "MANAGER"]), createEquipment);
+router.post("/", authenticate(["ADMIN", "MANAGER"]), validate(createEquipmentSchema), createEquipment);
 
 /**
  * @swagger

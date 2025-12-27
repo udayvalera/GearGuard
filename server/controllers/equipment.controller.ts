@@ -14,11 +14,6 @@ export const createEquipment = async (req: Request, res: Response): Promise<void
             maintenance_team_id, default_technician_id, department_id, employee_id 
         } = req.body;
 
-        // Basic Validation
-        if (!name || !serial_number || !maintenance_team_id || !category_id) {
-            res.status(400).json({ error: "Missing required fields" });
-            return;
-        }
 
         // M6.1: Manager Team Enforcement
         // Manager can only create equipment for THEIR team
