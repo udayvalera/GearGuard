@@ -12,3 +12,9 @@ export const createEquipmentSchema = z.object({
         employee_id: z.number().int().positive().optional()
     })
 });
+
+export const assignEquipmentSchema = z.object({
+    body: z.object({
+        employee_id: z.number().int().positive().nullable()
+    })
+});

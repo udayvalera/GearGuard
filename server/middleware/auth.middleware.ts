@@ -22,7 +22,7 @@ export const authenticate = (allowedRoles: string[] = []) => {
 
         try {
             const decoded = jwt.verify(token, JWT_SECRET) as DecodedToken;
-            
+
             // Cast to any to assign to req.user (since it's not strictly on Request type by default without declaration merging)
             // Or ensure your types/auth.ts is loaded correctly by tsconfig
             (req as any).user = decoded;

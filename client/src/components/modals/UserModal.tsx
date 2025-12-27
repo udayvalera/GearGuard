@@ -12,21 +12,17 @@ interface UserModalProps {
 }
 
 export const UserModal = ({ isOpen, onClose, user }: UserModalProps) => {
-    const { addUser, updateUser } = useData();
+    const { updateUser } = useData();
     const [name, setName] = useState('');
-    const [role, setRole] = useState<UserRole>('Employee');
+    const [role, setRole] = useState<UserRole>('EMPLOYEE');
     const [email, setEmail] = useState('');
 
     useEffect(() => {
         if (user) {
             setName(user.name);
             setRole(user.role);
-            // Mock email since it's not in the main type yet, or use name logic
-            setEmail((user as any).email || user.name.toLowerCase().replace(' ', '.') + '@gearguard.com');
-        } else {
-            setName('');
-            setRole('Employee');
-            setEmail('');
+            // Email is now part of the user object from API
+            setEmail((user as any).email || '');
         }
     }, [user, isOpen]);
 
@@ -40,15 +36,8 @@ export const UserModal = ({ isOpen, onClose, user }: UserModalProps) => {
             updateUser({
                 ...user,
                 name,
+                email,
                 role
-            });
-        } else {
-            // Add Mode
-            addUser({
-                id: `u-${Date.now()}`,
-                name,
-                role,
-                avatarUrl: `https://i.pravatar.cc/150?u=${Date.now()}` // Random avatar
             });
         }
         onClose();
@@ -59,7 +48,7 @@ export const UserModal = ({ isOpen, onClose, user }: UserModalProps) => {
             <div className="bg-[var(--color-surface-0)] rounded-[var(--radius-xl)] shadow-[var(--shadow-z3)] w-full max-w-[500px] p-6 animate-in zoom-in-95 duration-200">
                 <div className="flex justify-between items-center mb-6">
                     <h2 className="text-xl font-bold text-[var(--color-text-primary)]">
-                        {user ? 'Edit User' : 'Add New User'}
+                        Edit User
                     </h2>
                     <Button variant="ghost" size="sm" onClick={onClose}><X size={20} /></Button>
                 </div>
@@ -89,10 +78,10 @@ export const UserModal = ({ isOpen, onClose, user }: UserModalProps) => {
                             value={role}
                             onChange={e => setRole(e.target.value as UserRole)}
                         >
-                            <option value="Employee">Employee</option>
-                            <option value="Technician">Technician</option>
-                            <option value="Manager">Manager</option>
-                            <option value="Admin">Admin</option>
+                            <option value="EMPLOYEE">Employee</option>
+                            <option value="TECHNICIAN">Technician</option>
+                            <option value="MANAGER">Manager</option>
+                            <option value="ADMIN">Admin</option>
                         </select>
                     </div>
 
@@ -101,7 +90,7 @@ export const UserModal = ({ isOpen, onClose, user }: UserModalProps) => {
                             Cancel
                         </Button>
                         <Button type="submit" variant="primary">
-                            {user ? 'Save Changes' : 'Create User'}
+                            Save Changes
                         </Button>
                     </div>
                 </form>

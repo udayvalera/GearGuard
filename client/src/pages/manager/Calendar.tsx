@@ -11,7 +11,7 @@ import { clsx } from 'clsx';
 const ScheduleModal = ({ isOpen, onClose, date, onSchedule }: any) => {
     const { equipment, users } = useData();
     const activeEquipment = equipment.filter(e => e.isActive);
-    const technicians = users.filter(u => u.role === 'Technician');
+    const technicians = users.filter(u => u.role === 'TECHNICIAN');
 
     const [formData, setFormData] = useState({
         equipmentId: '',

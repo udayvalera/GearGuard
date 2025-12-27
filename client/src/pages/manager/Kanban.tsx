@@ -134,7 +134,7 @@ export default function Kanban() {
 
     const activeRequest = activeId ? requests.find(r => r.id === activeId) : null;
     const activeEquipment = activeRequest ? equipment.find(e => e.id === activeRequest.equipmentId) : undefined;
-    const technicians = users.filter(u => u.role === 'Technician');
+    const technicians = users.filter(u => u.role === 'TECHNICIAN');
 
     return (
         <>
