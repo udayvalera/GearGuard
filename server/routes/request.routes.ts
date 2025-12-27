@@ -46,6 +46,37 @@ router.use(authenticate());
  *     responses:
  *       200:
  *         description: List of preventive maintenance events
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   id:
+ *                     type: integer
+ *                   subject:
+ *                     type: string
+ *                   scheduled_date:
+ *                     type: string
+ *                     format: date-time
+ *                   stage:
+ *                     type: object
+ *                     properties:
+ *                       name:
+ *                         type: string
+ *                   equipment:
+ *                     type: object
+ *                     properties:
+ *                       name:
+ *                         type: string
+ *                       location:
+ *                         type: string
+ *                   technician:
+ *                     type: object
+ *                     properties:
+ *                       name:
+ *                         type: string
  */
 router.get("/calendar", getCalendar);
 
@@ -84,9 +115,24 @@ router.get("/calendar", getCalendar);
  *                 type: string
  *                 format: date
  *                 description: Required for Preventive. Must be today or in the future.
+ *               duration_hours:
+ *                 type: number
  *     responses:
  *       201:
- *         description: Request created
+ *         description: Request created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: integer
+ *                 subject:
+ *                   type: string
+ *                 status:
+ *                   type: string
+ *                 equipment_id:
+ *                   type: integer
  *       400:
  *         description: Validation error (e.g. past date)
  *       409:
@@ -107,9 +153,54 @@ router.post("/", createRequest);
  *     tags: [Requests]
  *     security:
  *       - cookieAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
  *     responses:
  *       200:
  *         description: List of maintenance requests
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: integer
+ *                       subject:
+ *                         type: string
+ *                       request_type:
+ *                         type: string
+ *                       is_overdue:
+ *                         type: boolean
+ *                       stage:
+ *                         type: object
+ *                         properties:
+ *                           name:
+ *                             type: string
+ *                 meta:
+ *                   type: object
+ *                   properties:
+ *                     total:
+ *                       type: integer
+ *                     page:
+ *                       type: integer
+ *                     limit:
+ *                       type: integer
  */
 router.get("/", getRequests);
 
@@ -144,6 +235,21 @@ router.get("/", getRequests);
  *     responses:
  *       200:
  *         description: Assigned successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Assignment successful
+ *                 request:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                     technician_id:
+ *                       type: integer
  *       403:
  *         description: Cross-team assignment violation
  *       404:
@@ -186,6 +292,14 @@ router.patch("/:id/assign", assignRequest);
  *     responses:
  *       200:
  *         description: Status updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Maintenance Completed
  *       400:
  *         description: Invalid transition or missing duration
  *       403:
@@ -213,6 +327,27 @@ router.patch("/:id/status", updateStatus);
  *     responses:
  *       200:
  *         description: List of maintenance logs
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   id:
+ *                     type: integer
+ *                   message:
+ *                     type: string
+ *                   created_at:
+ *                     type: string
+ *                     format: date-time
+ *                   created_by:
+ *                     type: object
+ *                     properties:
+ *                       name:
+ *                         type: string
+ *                       role:
+ *                         type: string
  *       404:
  *         description: Request not found
  */
@@ -252,6 +387,14 @@ router.get("/:id/logs", getRequestLogs);
  *     responses:
  *       200:
  *         description: Rescheduled successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Request rescheduled successfully
  *       400:
  *         description: Past date or non-preventive request
  *       403:
