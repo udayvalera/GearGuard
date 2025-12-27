@@ -1,5 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import { LayoutDashboard, Kanban, Calendar, BarChart3, ShieldCheck, ChevronLeft, ChevronRight } from 'lucide-react';
 import { clsx } from 'clsx';
 import { Button } from './Button';
@@ -25,6 +26,15 @@ const SidebarItem = ({ to, icon: Icon, label, collapsed }: { to: string; icon: a
 
 export const Sidebar = () => {
     const [collapsed, setCollapsed] = React.useState(false);
+    const { user } = useAuth();
+
+    // Default to 'guest' or null if no user, preventing crash
+    const currentRole = user?.role || null;
+
+    // If no user/role (e.g. login page), don't render sidebar or render minimal
+    // However, Sidebar is usually only in Protected routes. 
+    // If it's rendering on Login, it means Layout is being used on Login.
+    if (!currentRole) return null;
 
     return (
         <aside
@@ -41,17 +51,41 @@ export const Sidebar = () => {
                     {!collapsed && (
                         <div>
                             <h1 className="text-sm font-bold text-[var(--color-text-primary)] leading-tight">GearGuard</h1>
-                            <p className="text-[10px] text-[var(--color-text-tertiary)] font-bold tracking-wider">MANAGER</p>
+                            <p className="text-[10px] text-[var(--color-text-tertiary)] font-bold tracking-wider uppercase">{currentRole}</p>
                         </div>
                     )}
                 </div>
             </div>
 
             <nav className="flex-1 py-4 flex flex-col gap-1 overflow-y-auto overflow-x-hidden">
+                {/* Common Dashboard */}
                 <SidebarItem to="/" icon={LayoutDashboard} label="Dashboard" collapsed={collapsed} />
-                <SidebarItem to="/kanban" icon={Kanban} label="Work Board" collapsed={collapsed} />
-                <SidebarItem to="/calendar" icon={Calendar} label="Schedule" collapsed={collapsed} />
-                <SidebarItem to="/reports" icon={BarChart3} label="Reports" collapsed={collapsed} />
+
+                {(currentRole === 'manager' || currentRole === 'technician') && (
+                    <>
+                        <SidebarItem to="/kanban" icon={Kanban} label="Work Board" collapsed={collapsed} />
+                        <SidebarItem to="/calendar" icon={Calendar} label="Schedule" collapsed={collapsed} />
+                    </>
+                )}
+
+                {currentRole === 'manager' && (
+                    <SidebarItem to="/reports" icon={BarChart3} label="Reports" collapsed={collapsed} />
+                )}
+
+                {currentRole === 'employee' && (
+                    <>
+                        <SidebarItem to="/my-requests" icon={Kanban} label="My Requests" collapsed={collapsed} />
+                        <SidebarItem to="/my-equipment" icon={ShieldCheck} label="My Equipment" collapsed={collapsed} />
+                    </>
+                )}
+
+                {currentRole === 'admin' && (
+                    <>
+                        <SidebarItem to="/users" icon={ShieldCheck} label="Users" collapsed={collapsed} />
+                        <SidebarItem to="/teams" icon={ShieldCheck} label="Teams" collapsed={collapsed} />
+                        <SidebarItem to="/equipment" icon={ShieldCheck} label="Equipment" collapsed={collapsed} />
+                    </>
+                )}
             </nav>
 
             <div className="p-4 border-t border-[var(--color-border-200)] flex justify-end">

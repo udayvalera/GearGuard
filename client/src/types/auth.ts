@@ -1,13 +1,16 @@
+export type Role = 'admin' | 'manager' | 'technician' | 'employee';
+
 export interface User {
     id: string;
+    name: string;
     email: string;
-    createdAt: string;
-    updatedAt: string;
-    role: "user" | "admin";
+    role: Role;
+    maintenance_team_id?: number;
+    created_at: string;
 }
 
 export interface AuthResponse {
     message: string;
-    user?: User;
+    user: User;
     token?: string; // Optional, as it's in a cookie
 }

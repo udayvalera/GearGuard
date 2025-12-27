@@ -37,7 +37,7 @@ const ScheduleModal = ({ isOpen, onClose, date, onSchedule }: any) => {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-            <div className="bg-[var(--color-surface-0)] rounded-[var(--radius-xl)] shadow-[var(--shadow-z3)] max-w-lg w-full p-6 animate-in zoom-in-95 duration-200">
+            <div className="bg-[var(--color-surface-0)] rounded-[var(--radius-xl)] shadow-[var(--shadow-z3)] w-full max-w-[550px] p-6 animate-in zoom-in-95 duration-200">
                 <div className="flex justify-between items-center mb-6">
                     <h2 className="text-xl font-bold text-[var(--color-text-primary)]">Schedule Maintenance</h2>
                     <Button variant="ghost" size="sm" onClick={onClose}><X size={20} /></Button>
