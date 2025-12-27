@@ -10,6 +10,8 @@ import authRoutes from './routes/auth.routes.js';
 import rbacRoutes from './routes/rbac.routes.js';
 import equipmentRoutes from './routes/equipment.routes.js';
 import requestRoutes from './routes/request.routes.js'; // 👈 Added
+import teamsRoutes from './routes/teams.routes.js';
+import stagesRoutes from './routes/stages.routes.js';
 
 dotenv.config();
 
@@ -31,6 +33,8 @@ app.use(`${apiVersion}/auth`, authRoutes);
 app.use(`${apiVersion}/rbac`, rbacRoutes);
 app.use(`${apiVersion}/equipment`, equipmentRoutes);
 app.use(`${apiVersion}/requests`, requestRoutes); // 👈 Mount RBAC routes
+app.use(`${apiVersion}/teams`, teamsRoutes);
+app.use(`${apiVersion}/stages`, stagesRoutes);
 
 // Health Check
 app.get('/', (req: Request, res: Response) => {
