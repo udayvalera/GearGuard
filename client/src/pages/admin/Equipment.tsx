@@ -41,6 +41,7 @@ const EquipmentPage = () => {
                             <th className="p-4">Equipment Name</th>
                             <th className="p-4">Model / Serial</th>
                             <th className="p-4">Location</th>
+                            <th className="p-4">Assigned To</th>
                             <th className="p-4">Status</th>
                             <th className="p-4 text-right">Actions</th>
                         </tr>
@@ -55,13 +56,16 @@ const EquipmentPage = () => {
                                     </div>
                                 </td>
                                 <td className="p-4 text-sm text-[var(--color-text-secondary)]">
-                                    {item.model} <br /> <span className="text-[10px] uppercase font-mono">{item.serialNumber}</span>
+                                    <span className="text-[10px] uppercase font-mono">{item.serialNumber}</span>
                                 </td>
                                 <td className="p-4 text-sm text-[var(--color-text-secondary)]">
                                     {item.location}
                                 </td>
+                                <td className="p-4 text-sm text-[var(--color-text-secondary)]">
+                                    {item.employeeName || <span className="text-[var(--color-text-tertiary)] italic">Unassigned</span>}
+                                </td>
                                 <td className="p-4">
-                                    <Badge variant={item.status === 'Active' ? 'success' : 'error'}>
+                                    <Badge variant={item.status === 'Operational' ? 'success' : 'error'}>
                                         {item.status}
                                     </Badge>
                                 </td>

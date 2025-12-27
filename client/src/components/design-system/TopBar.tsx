@@ -5,6 +5,8 @@ import { useData } from '../../context/DataContext';
 export const TopBar = () => {
     const { currentUser } = useData();
 
+    if (!currentUser) return null;
+
     return (
         <header className="h-16 border-b border-[var(--color-border-200)] bg-[var(--color-surface-0)] flex items-center justify-between px-4 sticky top-0 z-10 w-full">
             {/* Left spacer for centering */}

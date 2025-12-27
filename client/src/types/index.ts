@@ -1,8 +1,9 @@
-export type UserRole = 'Manager' | 'Technician' | 'Employee';
+export type UserRole = 'MANAGER' | 'TECHNICIAN' | 'EMPLOYEE' | 'ADMIN';
 
 export interface User {
     id: string;
     name: string;
+    email: string; // Added email
     role: UserRole;
     avatarUrl?: string; // Optional URL for avatar image
 }
@@ -24,6 +25,8 @@ export interface Equipment {
     defaultTechnicianId?: string;
     isActive: boolean;
     status: EquipmentStatus;
+    employeeId?: string;
+    employeeName?: string;
 }
 
 export type RequestPriority = 'Low' | 'Medium' | 'High';

@@ -10,7 +10,7 @@ const TechnicianDashboard = () => {
     const { requests, equipment, users } = useData();
     const { user } = useAuth();
 
-    const technicians = useMemo(() => users.filter(u => u.role === 'Technician'), [users]);
+    const technicians = useMemo(() => users.filter(u => u.role === 'TECHNICIAN'), [users]);
 
     // Mock filtering for "My Assigned Tasks"
     const myTasks = useMemo(() => {

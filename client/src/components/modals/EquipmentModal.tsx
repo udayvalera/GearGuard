@@ -12,12 +12,13 @@ interface EquipmentModalProps {
 }
 
 export const EquipmentModal = ({ isOpen, onClose, equipment }: EquipmentModalProps) => {
-    const { addEquipment, updateEquipment } = useData();
+    const { addEquipment, updateEquipment, assignEquipment, users } = useData();
     const [name, setName] = useState('');
     const [model, setModel] = useState('');
     const [serial, setSerial] = useState('');
     const [location, setLocation] = useState('');
     const [status, setStatus] = useState<EquipmentStatus>('Operational');
+    const [assignedEmployeeId, setAssignedEmployeeId] = useState<string>('');
 
     useEffect(() => {
         if (equipment) {
@@ -26,18 +27,20 @@ export const EquipmentModal = ({ isOpen, onClose, equipment }: EquipmentModalPro
             setSerial(equipment.serialNumber);
             setLocation(equipment.location);
             setStatus(equipment.status);
+            setAssignedEmployeeId(equipment.employeeId || '');
         } else {
             setName('');
             setModel('');
             setSerial('');
             setLocation('');
             setStatus('Operational');
+            setAssignedEmployeeId('');
         }
     }, [equipment, isOpen]);
 
     if (!isOpen) return null;
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
         if (equipment) {
@@ -49,6 +52,11 @@ export const EquipmentModal = ({ isOpen, onClose, equipment }: EquipmentModalPro
                 status,
                 // Add model if expanded
             });
+
+            // Handle Assignment
+            if (equipment.employeeId !== assignedEmployeeId) {
+                await assignEquipment(equipment.id, assignedEmployeeId || null);
+            }
         } else {
             addEquipment({
                 id: `eq-${Date.now()}`,
@@ -59,6 +67,7 @@ export const EquipmentModal = ({ isOpen, onClose, equipment }: EquipmentModalPro
                 isActive: status !== 'Scrapped',
                 teamId: '1' // Default
             });
+            // Note: Assignment for new equipment is not yet handled in backend creation or context
         }
         onClose();
     };
@@ -105,6 +114,22 @@ export const EquipmentModal = ({ isOpen, onClose, equipment }: EquipmentModalPro
                         onChange={e => setLocation(e.target.value)}
                         placeholder="e.g. Zone B - Floor 2"
                     />
+
+                    <div className="space-y-1">
+                        <label className="text-sm font-medium text-[var(--color-text-secondary)]">Assigned Employee</label>
+                        <select
+                            className="w-full h-10 px-3 rounded-[var(--radius-md)] border border-[var(--color-border-200)] bg-[var(--color-surface-0)] text-sm focus:ring-2 focus:ring-[var(--color-brand-500)] outline-none"
+                            value={assignedEmployeeId}
+                            onChange={e => setAssignedEmployeeId(e.target.value)}
+                        >
+                            <option value="">Unassigned</option>
+                            {users.map(user => (
+                                <option key={user.id} value={user.id}>
+                                    {user.name} ({user.role})
+                                </option>
+                            ))}
+                        </select>
+                    </div>
 
                     <div className="space-y-1">
                         <label className="text-sm font-medium text-[var(--color-text-secondary)]">Status</label>
