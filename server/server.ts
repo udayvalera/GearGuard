@@ -4,9 +4,10 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import cookieParser from 'cookie-parser'; // 👈 Added
+import cookieParser from 'cookie-parser';
 
-import authRoutes from './routes/auth.routes.js'; // 👈 Added .js extension for ESM
+import authRoutes from './routes/auth.routes.js';
+import rbacRoutes from './routes/rbac.routes.js'; // 👈 Added
 
 dotenv.config();
 
@@ -15,16 +16,17 @@ const apiVersion = '/api/v1';
 
 // Middleware
 app.use(express.json());
-app.use(cookieParser()); // 👈 Enable cookie parsing
+app.use(cookieParser());
 app.use(cors({
     origin: process.env.CLIENT_URL || 'http://localhost:3000',
-    credentials: true // Allow cookies to be sent from frontend
+    credentials: true
 }));
 app.use(helmet());
 app.use(morgan('dev'));
 
 // Routes
 app.use(`${apiVersion}/auth`, authRoutes);
+app.use(`${apiVersion}/rbac`, rbacRoutes); // 👈 Mount RBAC routes
 
 // Health Check
 app.get('/', (req: Request, res: Response) => {
