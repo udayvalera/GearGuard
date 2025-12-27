@@ -76,3 +76,80 @@ export const createRequest = async (req: Request, res: Response): Promise<void> 
 export const getRequests = async (req: Request, res: Response) => {
     res.json({ message: "List API coming in Phase 5" });
 };
+// 5.1 Assign Request
+export const assignRequest = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const requestId = Number(req.params.id);
+        const { technician_id } = req.body;
+        const user = (req as any).user; // Logged in user (Manager/Admin)
+
+        if (!technician_id) {
+            res.status(400).json({ error: "Technician ID is required" });
+            return;
+        }
+
+        // 1. Fetch Request
+        const request = await prisma.maintenanceRequest.findUnique({
+            where: { id: requestId },
+            include: { stage: true }
+        });
+
+        if (!request) {
+            res.status(404).json({ error: "Request not found" });
+            return;
+        }
+
+        // 2. Fetch Technician & Validate Team
+        const technician = await prisma.employee.findUnique({
+            where: { id: technician_id }
+        });
+
+        if (!technician) {
+            res.status(404).json({ error: "Technician not found" });
+            return;
+        }
+
+        // STRICT RULE: Technician must belong to the request's team
+        if (technician.maintenance_team_id !== request.team_id) {
+            res.status(403).json({ 
+                error: "Invalid Assignment: Technician does not belong to the assigned maintenance team." 
+            });
+            return;
+        }
+
+        // 3. Determine New Stage (Auto-transition logic)
+        // If "New" -> Assigning triggers "In Progress" (Section 6.2 BRS)
+        let newStageId = request.stage_id;
+        if (request.stage.name === 'New') {
+            const inProgressStage = await prisma.maintenanceStage.findUnique({ where: { name: 'In Progress' } });
+            if (inProgressStage) newStageId = inProgressStage.id;
+        }
+
+        // 4. Update Request & Create Log (Transaction)
+        const updatedRequest = await prisma.$transaction([
+            prisma.maintenanceRequest.update({
+                where: { id: requestId },
+                data: { 
+                    technician_id,
+                    stage_id: newStageId
+                }
+            }),
+            // Audit Log
+            prisma.maintenanceLog.create({
+                data: {
+                    request_id: requestId,
+                    equipment_id: request.equipment_id,
+                    message: `Assigned to technician: ${technician.name}`,
+                    created_by_id: user.id
+                }
+            })
+        ]);
+
+        res.json({ message: "Assignment successful", request: updatedRequest[0] });
+
+    } catch (error) {
+        console.error("Assignment Error:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+
