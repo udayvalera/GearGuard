@@ -61,25 +61,25 @@ export const Sidebar = () => {
                 {/* Common Dashboard */}
                 <SidebarItem to="/" icon={LayoutDashboard} label="Dashboard" collapsed={collapsed} />
 
-                {(currentRole === 'manager' || currentRole === 'technician') && (
+                {(currentRole === 'MANAGER' || currentRole === 'TECHNICIAN') && (
                     <>
                         <SidebarItem to="/kanban" icon={Kanban} label="Work Board" collapsed={collapsed} />
                         <SidebarItem to="/calendar" icon={Calendar} label="Schedule" collapsed={collapsed} />
                     </>
                 )}
 
-                {currentRole === 'manager' && (
+                {currentRole === 'MANAGER' && (
                     <SidebarItem to="/reports" icon={BarChart3} label="Reports" collapsed={collapsed} />
                 )}
 
-                {currentRole === 'employee' && (
+                {currentRole === 'EMPLOYEE' && (
                     <>
                         <SidebarItem to="/my-requests" icon={Kanban} label="My Requests" collapsed={collapsed} />
                         <SidebarItem to="/my-equipment" icon={ShieldCheck} label="My Equipment" collapsed={collapsed} />
                     </>
                 )}
 
-                {currentRole === 'admin' && (
+                {currentRole === 'ADMIN' && (
                     <>
                         <SidebarItem to="/users" icon={ShieldCheck} label="Users" collapsed={collapsed} />
                         <SidebarItem to="/teams" icon={ShieldCheck} label="Teams" collapsed={collapsed} />

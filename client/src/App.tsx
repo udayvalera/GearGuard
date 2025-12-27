@@ -42,19 +42,19 @@ function App() {
                 <Route path="/reports" element={<Reports />} />
 
                 {/* Employee Routes */}
-                <Route path="/my-requests" element={<ProtectedRoute allowedRoles={['employee']}><MyRequests /></ProtectedRoute>} />
-                <Route path="/my-equipment" element={<ProtectedRoute allowedRoles={['employee']}><MyEquipment /></ProtectedRoute>} />
+                <Route path="/my-requests" element={<ProtectedRoute allowedRoles={['EMPLOYEE']}><MyRequests /></ProtectedRoute>} />
+                <Route path="/my-equipment" element={<ProtectedRoute allowedRoles={['EMPLOYEE']}><MyEquipment /></ProtectedRoute>} />
 
                 {/* Admin Routes */}
-                <Route path="/users" element={<ProtectedRoute allowedRoles={['admin']}><UsersPage /></ProtectedRoute>} />
-                <Route path="/teams" element={<ProtectedRoute allowedRoles={['admin']}><TeamsPage /></ProtectedRoute>} />
-                <Route path="/equipment" element={<ProtectedRoute allowedRoles={['admin']}><EquipmentPage /></ProtectedRoute>} />
-                <Route path="/settings" element={<ProtectedRoute allowedRoles={['admin']}><SettingsPage /></ProtectedRoute>} />
+                <Route path="/users" element={<ProtectedRoute allowedRoles={['ADMIN']}><UsersPage /></ProtectedRoute>} />
+                <Route path="/teams" element={<ProtectedRoute allowedRoles={['ADMIN']}><TeamsPage /></ProtectedRoute>} />
+                <Route path="/equipment" element={<ProtectedRoute allowedRoles={['ADMIN']}><EquipmentPage /></ProtectedRoute>} />
+                <Route path="/settings" element={<ProtectedRoute allowedRoles={['ADMIN']}><SettingsPage /></ProtectedRoute>} />
               </Route>
             </Route>
 
             {/* Legacy Admin Route (optional) */}
-            <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
+            <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
               <Route path="/admin-legacy" element={<AdminPage />} />
             </Route>
 

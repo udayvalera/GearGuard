@@ -9,9 +9,9 @@ const Protected: React.FC = () => {
     const { user } = useAuth();
     const role = user?.role;
 
-    if (role === 'admin') return <AdminDashboard />;
-    if (role === 'manager') return <ManagerDashboard />;
-    if (role === 'technician') return <TechnicianDashboard />;
+    if (role === 'ADMIN') return <AdminDashboard />;
+    if (role === 'MANAGER') return <ManagerDashboard />;
+    if (role === 'TECHNICIAN') return <TechnicianDashboard />;
 
     return <EmployeeDashboard />;
 };

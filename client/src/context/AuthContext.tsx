@@ -66,24 +66,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
     };
 
-    const mockLogin = async (role: string) => {
-        setIsLoading(true);
-        // Simulate API delay
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        const mockUser: User = {
-            id: `mock-${role}-id`,
-            name: `Mock ${role.charAt(0).toUpperCase() + role.slice(1)}`,
-            email: `${role}@gearguard.com`,
-            role: role,
-            maintenance_team_id: role === 'technician' ? 1 : undefined,
-            created_at: new Date().toISOString()
-        };
-
-        setUser(mockUser);
-        setIsLoading(false);
-    };
-
     return (
         <AuthContext.Provider
             value={{
@@ -93,8 +75,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 login,
                 signup,
                 logout,
-                // @ts-ignore - Adding mockLogin to context value even if not in interface yet for dev speed
-                mockLogin
             }}
         >
             {children}
@@ -102,10 +82,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     );
 };
 
-export const useAuth = (): AuthContextType & { mockLogin: (role: string) => Promise<void> } => {
+export const useAuth = (): AuthContextType => {
     const context = useContext(AuthContext);
     if (!context) {
         throw new Error("useAuth must be used within an AuthProvider");
     }
-    return context as AuthContextType & { mockLogin: (role: string) => Promise<void> };
+    return context;
 };
