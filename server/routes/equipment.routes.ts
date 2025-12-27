@@ -1,11 +1,12 @@
 import { validate } from "../middleware/validate.middleware.js";
-import { createEquipmentSchema } from "../schemas/equipment.schema.js";
+import { createEquipmentSchema, assignEquipmentSchema } from "../schemas/equipment.schema.js";
 import { Router } from "express";
 import {
   createEquipment,
   getEquipment,
   getEquipmentStats,
-  getEquipmentRequests
+  getEquipmentRequests,
+  assignEquipment
 } from "../controllers/equipment.controller.js";
 import { authenticate } from "../middleware/auth.middleware.js";
 
@@ -222,5 +223,40 @@ router.get("/:id/stats", getEquipmentStats);
  *         description: Equipment not found
  */
 router.get("/:id/requests", getEquipmentRequests);
+
+/**
+ * @swagger
+ * /equipment/{id}/assign:
+ *   patch:
+ *     summary: Assign equipment to an employee
+ *     tags: [Equipment]
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               employee_id:
+ *                 type: integer
+ *                 nullable: true
+ *                 description: ID of the employee to assign (or null to unassign)
+ *     responses:
+ *       200:
+ *         description: Equipment assigned successfully
+ *       403:
+ *         description: Unauthorized
+ *       404:
+ *         description: Equipment not found
+ */
+router.patch("/:id/assign", authenticate(["ADMIN"]), validate(assignEquipmentSchema), assignEquipment);
 
 export default router;

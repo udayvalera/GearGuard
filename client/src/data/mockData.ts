@@ -5,11 +5,11 @@ const generateId = (prefix: string, index: number) => `${prefix}-${String(index 
 
 // Mock Users (Technicians & Managers)
 export const MOCK_USERS: User[] = [
-    { id: 'usr-001', name: 'Alice Manager', role: 'Manager', avatarUrl: 'https://i.pravatar.cc/150?u=usr-001' },
-    { id: 'tech-001', name: 'Bob Fixer', role: 'Technician', avatarUrl: 'https://i.pravatar.cc/150?u=tech-001' },
-    { id: 'tech-002', name: 'Charlie Wrench', role: 'Technician', avatarUrl: 'https://i.pravatar.cc/150?u=tech-002' },
-    { id: 'tech-003', name: 'Dana Spark', role: 'Technician', avatarUrl: 'https://i.pravatar.cc/150?u=tech-003' },
-    { id: 'tech-004', name: 'Evan Gear', role: 'Technician', avatarUrl: 'https://i.pravatar.cc/150?u=tech-004' },
+    { id: 'usr-001', name: 'Alice Manager', role: 'MANAGER', email: 'alice@gearguard.com', avatarUrl: 'https://i.pravatar.cc/150?u=usr-001' },
+    { id: 'tech-001', name: 'Bob Fixer', role: 'TECHNICIAN', email: 'bob@gearguard.com', avatarUrl: 'https://i.pravatar.cc/150?u=tech-001' },
+    { id: 'tech-002', name: 'Charlie Wrench', role: 'TECHNICIAN', email: 'charlie@gearguard.com', avatarUrl: 'https://i.pravatar.cc/150?u=tech-002' },
+    { id: 'tech-003', name: 'Dana Spark', role: 'TECHNICIAN', email: 'dana@gearguard.com', avatarUrl: 'https://i.pravatar.cc/150?u=tech-003' },
+    { id: 'tech-004', name: 'Evan Gear', role: 'TECHNICIAN', email: 'evan@gearguard.com', avatarUrl: 'https://i.pravatar.cc/150?u=tech-004' },
 ];
 
 export const CURRENT_USER_ID = 'usr-001';

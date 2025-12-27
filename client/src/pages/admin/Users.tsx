@@ -3,7 +3,7 @@ import { useData } from '../../context/DataContext';
 import { Card } from '../../components/design-system/Card';
 import { Badge } from '../../components/design-system/Badge';
 import { Button } from '../../components/design-system/Button';
-import { Plus, User, Mail } from 'lucide-react';
+import { User, Mail } from 'lucide-react';
 import { UserModal } from '../../components/modals/UserModal';
 import type { User as UserType } from '../../types';
 
@@ -17,11 +17,6 @@ const UsersPage = () => {
         setIsModalOpen(true);
     };
 
-    const handleAdd = () => {
-        setSelectedUser(null);
-        setIsModalOpen(true);
-    };
-
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
@@ -29,9 +24,6 @@ const UsersPage = () => {
                     <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">User Management</h1>
                     <p className="text-[var(--color-text-secondary)]">Manage system access and roles.</p>
                 </div>
-                <Button variant="primary" leftIcon={<Plus size={16} />} onClick={handleAdd}>
-                    Add User
-                </Button>
             </div>
 
             <Card className="overflow-hidden p-0">

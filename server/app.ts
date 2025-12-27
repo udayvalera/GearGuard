@@ -14,6 +14,8 @@ import rbacRoutes from './routes/rbac.routes.js';
 import equipmentRoutes from './routes/equipment.routes.js';
 import requestRoutes from './routes/request.routes.js'; // 👈 Added
 import teamsRoutes from './routes/teams.routes.js';
+import usersRoutes from './routes/users.routes.js';
+
 import stagesRoutes from './routes/stages.routes.js';
 
 dotenv.config();
@@ -41,6 +43,8 @@ app.use(`${apiVersion}/rbac`, rbacRoutes);
 app.use(`${apiVersion}/equipment`, equipmentRoutes);
 app.use(`${apiVersion}/requests`, requestRoutes); // 👈 Mount RBAC routes
 app.use(`${apiVersion}/teams`, teamsRoutes);
+app.use(`${apiVersion}/users`, usersRoutes);
+
 app.use(`${apiVersion}/stages`, stagesRoutes);
 
 // Health Check
@@ -51,7 +55,7 @@ app.get('/', (req: Request, res: Response) => {
 // Global Error Handler
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   console.error('❌ Error:', err.message);
-  
+
   const statusCode = err.statusCode || 500;
   const message = err.message || 'Internal Server Error';
 

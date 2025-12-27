@@ -7,7 +7,7 @@ import { Card } from '../../components/design-system/Card';
 
 const Reports = () => {
     const { users, requests } = useData();
-    const technicians = users.filter(u => u.role === 'Technician');
+    const technicians = users.filter(u => u.role === 'TECHNICIAN');
 
     const reportData = useMemo(() => {
         return technicians.map(tech => {

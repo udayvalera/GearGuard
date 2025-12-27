@@ -37,7 +37,7 @@ const Dashboard = () => {
     const chartData = useMemo(() => {
         const techMap = new Map<string, number>();
 
-        users.filter(u => u.role === 'Technician').forEach(u => {
+        users.filter(u => u.role === 'TECHNICIAN').forEach(u => {
             techMap.set(u.id, 0);
         });
 

@@ -8,10 +8,10 @@ export const createEquipment = async (req: Request, res: Response): Promise<void
     try {
         // FIX: Extract user here so it is available for validation
         const user = (req as any).user;
-        
-        const { 
-            name, serial_number, location, category_id, 
-            maintenance_team_id, default_technician_id, department_id, employee_id 
+
+        const {
+            name, serial_number, location, category_id,
+            maintenance_team_id, default_technician_id, department_id, employee_id
         } = req.body;
 
 
@@ -28,9 +28,9 @@ export const createEquipment = async (req: Request, res: Response): Promise<void
         // Validate Technician belongs to Team
         if (default_technician_id) {
             const tech = await prisma.employee.findFirst({
-                where: { 
+                where: {
                     id: default_technician_id,
-                    maintenance_team_id: maintenance_team_id 
+                    maintenance_team_id: maintenance_team_id
                 }
             });
             if (!tech) {
@@ -55,8 +55,8 @@ export const createEquipment = async (req: Request, res: Response): Promise<void
         res.status(201).json(equipment);
     } catch (error: any) {
         if (error.code === 'P2002') {
-             res.status(409).json({ error: "Serial number must be unique" });
-             return;
+            res.status(409).json({ error: "Serial number must be unique" });
+            return;
         }
         console.error("Create Equipment Error:", error);
         res.status(500).json({ error: "Internal Server Error" });
@@ -68,9 +68,9 @@ export const getEquipment = async (req: Request, res: Response): Promise<void> =
     try {
         const user = (req as any).user;
         const { page = "1", limit = "10", search, department_id } = req.query;
-        
+
         const skip = (Number(page) - 1) * Number(limit);
-        
+
         // Build Where Clause
         const where: any = { is_active: true };
 
@@ -81,7 +81,7 @@ export const getEquipment = async (req: Request, res: Response): Promise<void> =
             if (employee?.maintenance_team_id) {
                 where.maintenance_team_id = employee.maintenance_team_id;
             }
-        } 
+        }
         // EMPLOYEE: Sees ONLY equipment assigned to them (Owner)
         else if (user.role === 'EMPLOYEE') {
             where.employee_id = user.id;
@@ -135,14 +135,14 @@ export const getEquipment = async (req: Request, res: Response): Promise<void> =
 export const getEquipmentStats = async (req: Request, res: Response): Promise<void> => {
     try {
         const id = Number(req.params.id);
-        
+
         const [total, open] = await prisma.$transaction([
             prisma.maintenanceRequest.count({ where: { equipment_id: id } }),
-            prisma.maintenanceRequest.count({ 
-                where: { 
+            prisma.maintenanceRequest.count({
+                where: {
                     equipment_id: id,
                     stage: { name: { in: ['New', 'In Progress'] } }
-                } 
+                }
             })
         ]);
 
@@ -161,7 +161,7 @@ export const getEquipmentStats = async (req: Request, res: Response): Promise<vo
 export const getEquipmentRequests = async (req: Request, res: Response): Promise<void> => {
     try {
         const id = Number(req.params.id);
-        
+
         const requests = await prisma.maintenanceRequest.findMany({
             where: { equipment_id: id },
             include: {
@@ -174,6 +174,35 @@ export const getEquipmentRequests = async (req: Request, res: Response): Promise
 
         res.json(requests);
     } catch (error) {
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+
+// 3.5 Assign Employee to Equipment
+export const assignEquipment = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const id = Number(req.params.id);
+        const { employee_id } = req.body;
+
+        const equipment = await prisma.equipment.findUnique({ where: { id } });
+        if (!equipment) {
+            res.status(404).json({ error: "Equipment not found" });
+            return;
+        }
+
+        const updatedEquipment = await prisma.equipment.update({
+            where: { id },
+            data: {
+                employee_id: employee_id
+            },
+            include: {
+                employee: { select: { name: true } }
+            }
+        });
+
+        res.json(updatedEquipment);
+    } catch (error) {
+        console.error("Assign Equipment Error:", error);
         res.status(500).json({ error: "Internal Server Error" });
     }
 };
