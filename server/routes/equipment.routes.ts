@@ -13,7 +13,7 @@ const router = Router();
  * @swagger
  * tags:
  *   name: Equipment
- *   description: Equipment asset management
+ *   description: Equipment asset management and visibility
  */
 
 router.use(authenticate());
@@ -22,7 +22,10 @@ router.use(authenticate());
  * @swagger
  * /equipment:
  *   post:
- *     summary: Create new equipment (Admin/Manager)
+ *     summary: Create new equipment
+ *     description: >
+ *       Admins can create equipment for any team.
+ *       Managers can ONLY create equipment for their assigned maintenance team.
  *     tags: [Equipment]
  *     security:
  *       - cookieAuth: []
@@ -35,8 +38,8 @@ router.use(authenticate());
  *             required:
  *               - name
  *               - serial_number
- *               - category_id
  *               - maintenance_team_id
+ *               - category_id
  *             properties:
  *               name:
  *                 type: string
@@ -48,9 +51,13 @@ router.use(authenticate());
  *                 type: integer
  *               maintenance_team_id:
  *                 type: integer
+ *               default_technician_id:
+ *                 type: integer
  *     responses:
  *       201:
  *         description: Equipment created
+ *       403:
+ *         description: Manager attempted to create equipment for a different team
  *       409:
  *         description: Serial number conflict
  */
@@ -60,7 +67,11 @@ router.post("/", authenticate(["ADMIN", "MANAGER"]), createEquipment);
  * @swagger
  * /equipment:
  *   get:
- *     summary: List equipment (role-filtered)
+ *     summary: List equipment
+ *     description: >
+ *       - Admins see all equipment.
+ *       - Managers and Technicians see only their team's equipment.
+ *       - Employees see only equipment assigned to them.
  *     tags: [Equipment]
  *     security:
  *       - cookieAuth: []
@@ -85,7 +96,7 @@ router.get("/", getEquipment);
  * @swagger
  * /equipment/{id}/stats:
  *   get:
- *     summary: Get maintenance stats for smart badge
+ *     summary: Get maintenance stats
  *     tags: [Equipment]
  *     security:
  *       - cookieAuth: []
@@ -97,7 +108,7 @@ router.get("/", getEquipment);
  *           type: integer
  *     responses:
  *       200:
- *         description: Equipment maintenance stats
+ *         description: Equipment maintenance stats (open requests, status)
  *       404:
  *         description: Equipment not found
  */
