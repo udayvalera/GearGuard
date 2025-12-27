@@ -9,19 +9,29 @@ export const createRequest = async (req: Request, res: Response): Promise<void> 
         const user = (req as any).user;
         const { subject, request_type, scheduled_date, equipment_id, duration_hours } = req.body;
 
-        // 1. Basic Validation
         if (!subject || !request_type || !equipment_id) {
             res.status(400).json({ error: "Missing required fields: subject, request_type, equipment_id" });
             return;
         }
 
-        // 2. Validate Request Type & Date
-        if (request_type === RequestType.PREVENTIVE && !scheduled_date) {
-             res.status(400).json({ error: "Scheduled date is mandatory for Preventive requests" });
-             return;
+        // Validate Preventive Date
+        if (request_type === RequestType.PREVENTIVE) {
+            if (!scheduled_date) {
+                res.status(400).json({ error: "Scheduled date is mandatory for Preventive requests" });
+                return;
+            }
+            
+            // M2.2 Rule: Cannot schedule in the past
+            const today = new Date();
+            today.setHours(0, 0, 0, 0); // Reset time to start of day
+            const scheduled = new Date(scheduled_date);
+
+            if (scheduled < today) {
+                res.status(400).json({ error: "Cannot schedule Preventive Maintenance in the past." });
+                return;
+            }
         }
 
-        // 3. Fetch Equipment (and check if it exists + is active)
         const equipment = await prisma.equipment.findUnique({
             where: { id: equipment_id },
             include: { maintenance_team: true }
@@ -32,24 +42,17 @@ export const createRequest = async (req: Request, res: Response): Promise<void> 
             return;
         }
 
-        // 4. Critical Rule: Cannot create request for Scrapped equipment
         if (!equipment.is_active) {
             res.status(409).json({ error: "Conflict: Cannot create request for SCRAPPED equipment" });
             return;
         }
 
-        // 5. Fetch Initial Stage (New)
         const newStage = await prisma.maintenanceStage.findUnique({ where: { name: 'New' } });
         if (!newStage) throw new Error("Stage 'New' not found in DB seed");
 
-        // 6. Auto-fill Logic
-        // Team comes from Equipment
         const team_id = equipment.maintenance_team_id;
-        
-        // Default Technician (Optional auto-fill)
         const technician_id = equipment.default_technician_id || null;
 
-        // 7. Create Request
         const newRequest = await prisma.maintenanceRequest.create({
             data: {
                 subject,
@@ -72,9 +75,7 @@ export const createRequest = async (req: Request, res: Response): Promise<void> 
     }
 };
 
-// Placeholder for List API (Phase 5)
-
-// 8.1 List Requests (With Overdue Logic)
+// 8.1 List Requests (With Role + Overdue Logic)
 export const getRequests = async (req: Request, res: Response): Promise<void> => {
     try {
         const user = (req as any).user;
@@ -83,17 +84,19 @@ export const getRequests = async (req: Request, res: Response): Promise<void> =>
 
         const where: any = {};
 
-        // Filters
         if (status) where.stage = { name: String(status) };
         if (equipment_id) where.equipment_id = Number(equipment_id);
 
-        // Role Visibility
-        if (user.role === 'TECHNICIAN') {
+        // MANAGER & TECHNICIAN: See only their team's requests
+        if (user.role === 'TECHNICIAN' || user.role === 'MANAGER') {
             const emp = await prisma.employee.findUnique({ where: { id: user.id } });
             if (emp?.maintenance_team_id) where.team_id = emp.maintenance_team_id;
-        } else if (user.role === 'EMPLOYEE') {
+        } 
+        // EMPLOYEE: Sees only requests they created
+        else if (user.role === 'EMPLOYEE') {
             where.created_by_id = user.id;
         }
+        // ADMIN sees all
 
         const [total, requests] = await prisma.$transaction([
             prisma.maintenanceRequest.count({ where }),
@@ -111,11 +114,9 @@ export const getRequests = async (req: Request, res: Response): Promise<void> =>
             })
         ]);
 
-        // 8.1 Compute Overdue Flag
         const today = new Date();
         const enrichedData = requests.map(req => {
             let is_overdue = false;
-            // Rule: Preventive + Date Passed + Not Closed (Repaired/Scrap)
             if (
                 req.request_type === 'PREVENTIVE' && 
                 req.scheduled_date && 
@@ -142,14 +143,13 @@ export const assignRequest = async (req: Request, res: Response): Promise<void> 
     try {
         const requestId = Number(req.params.id);
         const { technician_id } = req.body;
-        const user = (req as any).user; // Logged in user (Manager/Admin)
+        const user = (req as any).user; 
 
         if (!technician_id) {
             res.status(400).json({ error: "Technician ID is required" });
             return;
         }
 
-        // 1. Fetch Request
         const request = await prisma.maintenanceRequest.findUnique({
             where: { id: requestId },
             include: { stage: true }
@@ -160,7 +160,6 @@ export const assignRequest = async (req: Request, res: Response): Promise<void> 
             return;
         }
 
-        // 2. Fetch Technician & Validate Team
         const technician = await prisma.employee.findUnique({
             where: { id: technician_id }
         });
@@ -170,7 +169,6 @@ export const assignRequest = async (req: Request, res: Response): Promise<void> 
             return;
         }
 
-        // STRICT RULE: Technician must belong to the request's team
         if (technician.maintenance_team_id !== request.team_id) {
             res.status(403).json({ 
                 error: "Invalid Assignment: Technician does not belong to the assigned maintenance team." 
@@ -178,15 +176,12 @@ export const assignRequest = async (req: Request, res: Response): Promise<void> 
             return;
         }
 
-        // 3. Determine New Stage (Auto-transition logic)
-        // If "New" -> Assigning triggers "In Progress" (Section 6.2 BRS)
         let newStageId = request.stage_id;
         if (request.stage.name === 'New') {
             const inProgressStage = await prisma.maintenanceStage.findUnique({ where: { name: 'In Progress' } });
             if (inProgressStage) newStageId = inProgressStage.id;
         }
 
-        // 4. Update Request & Create Log (Transaction)
         const updatedRequest = await prisma.$transaction([
             prisma.maintenanceRequest.update({
                 where: { id: requestId },
@@ -195,7 +190,6 @@ export const assignRequest = async (req: Request, res: Response): Promise<void> 
                     stage_id: newStageId
                 }
             }),
-            // Audit Log
             prisma.maintenanceLog.create({
                 data: {
                     request_id: requestId,
@@ -214,8 +208,7 @@ export const assignRequest = async (req: Request, res: Response): Promise<void> 
     }
 };
 
-
-// 6.1 Update Request Status (Workflow Engine)
+// 6.1 Update Request Status
 export const updateStatus = async (req: Request, res: Response): Promise<void> => {
     try {
         const requestId = Number(req.params.id);
@@ -227,7 +220,6 @@ export const updateStatus = async (req: Request, res: Response): Promise<void> =
             return;
         }
 
-        // 1. Fetch Request & Current Stage
         const request = await prisma.maintenanceRequest.findUnique({
             where: { id: requestId },
             include: { stage: true, equipment: true }
@@ -238,7 +230,6 @@ export const updateStatus = async (req: Request, res: Response): Promise<void> =
             return;
         }
 
-        // 2. Fetch Target Stage
         const targetStage = await prisma.maintenanceStage.findUnique({
             where: { id: stage_id }
         });
@@ -248,19 +239,15 @@ export const updateStatus = async (req: Request, res: Response): Promise<void> =
             return;
         }
 
-        // 3. State Machine & Rules
         const currentName = request.stage.name;
         const targetName = targetStage.name;
 
-        // A. Handle SCRAP Logic (Critical)
         if (targetStage.is_scrap_state) {
-            // Only Manager/Admin can Scrap
             if (!['MANAGER', 'ADMIN'].includes(user.role)) {
                 res.status(403).json({ error: "Only Managers or Admins can scrap equipment." });
                 return;
             }
 
-            // Transaction: Update Request + Deactivate Equipment + Log
             await prisma.$transaction([
                 prisma.maintenanceRequest.update({
                     where: { id: requestId },
@@ -287,15 +274,12 @@ export const updateStatus = async (req: Request, res: Response): Promise<void> =
             return;
         }
 
-        // B. Handle REPAIRED Logic
         if (targetName === 'Repaired') {
-            // Must define duration
             if (!duration_hours && !request.duration_hours) {
                 res.status(400).json({ error: "Duration (hours) is required when marking as Repaired" });
                 return;
             }
 
-            // Normal flow: In Progress -> Repaired
             if (currentName !== 'In Progress') {
                 res.status(400).json({ error: "Invalid Transition: Must be 'In Progress' before 'Repaired'" });
                 return;
@@ -324,20 +308,16 @@ export const updateStatus = async (req: Request, res: Response): Promise<void> =
             return;
         }
 
-        // C. Standard Transitions (e.g. New -> In Progress)
-        // Prevent skipping steps if needed, or just allow linear flow
         if (currentName === 'New' && targetName === 'Repaired') {
              res.status(400).json({ error: "Cannot jump from New to Repaired. Assign a technician first." });
              return;
         }
 
-        // Generic Update
         await prisma.maintenanceRequest.update({
             where: { id: requestId },
             data: { stage_id }
         });
 
-        // Audit Log
         await prisma.maintenanceLog.create({
             data: {
                 request_id: requestId,
@@ -354,8 +334,26 @@ export const updateStatus = async (req: Request, res: Response): Promise<void> =
     }
 };
 
+// 9.1 Get Logs
+export const getRequestLogs = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const requestId = Number(req.params.id);
+        
+        const logs = await prisma.maintenanceLog.findMany({
+            where: { request_id: requestId },
+            include: {
+                created_by: { select: { name: true, role: true } }
+            },
+            orderBy: { created_at: 'desc' }
+        });
 
-// 7.1 Calendar View (Preventive Only)
+        res.json(logs);
+    } catch (error) {
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+
+// 7.1 Calendar View
 export const getCalendar = async (req: Request, res: Response): Promise<void> => {
     try {
         const user = (req as any).user;
@@ -366,7 +364,6 @@ export const getCalendar = async (req: Request, res: Response): Promise<void> =>
             return;
         }
 
-        // Base Filter: Preventive + Date Range
         const where: any = {
             request_type: 'PREVENTIVE',
             scheduled_date: {
@@ -375,17 +372,13 @@ export const getCalendar = async (req: Request, res: Response): Promise<void> =>
             }
         };
 
-        // Role-Based Visibility
-        if (user.role === 'TECHNICIAN') {
+        // MANAGER & TECHNICIAN: See only their team's schedule
+        if (user.role === 'TECHNICIAN' || user.role === 'MANAGER') {
             const employee = await prisma.employee.findUnique({ where: { id: user.id } });
             if (employee?.maintenance_team_id) {
                 where.team_id = employee.maintenance_team_id;
             }
         }
-        // Employees usually don't see the maintenance calendar, 
-        // but if they do, maybe restrict to equipment they own? 
-        // For now, we'll keep it open for Employees to see schedule (or block it).
-        // Managers/Admins see all.
 
         const events = await prisma.maintenanceRequest.findMany({
             where,
@@ -407,24 +400,3 @@ export const getCalendar = async (req: Request, res: Response): Promise<void> =>
         res.status(500).json({ error: "Internal Server Error" });
     }
 };
-
-
-// 9.1 Get Logs (Audit History)
-export const getRequestLogs = async (req: Request, res: Response): Promise<void> => {
-    try {
-        const requestId = Number(req.params.id);
-        
-        const logs = await prisma.maintenanceLog.findMany({
-            where: { request_id: requestId },
-            include: {
-                created_by: { select: { name: true, role: true } }
-            },
-            orderBy: { created_at: 'desc' }
-        });
-
-        res.json(logs);
-    } catch (error) {
-        res.status(500).json({ error: "Internal Server Error" });
-    }
-};
-

@@ -67,17 +67,18 @@ export const getEquipment = async (req: Request, res: Response): Promise<void> =
         const where: any = { is_active: true };
 
         // Role-Based Filter
-        if (user.role === Role.TECHNICIAN) {
-            // Tech sees equipment managed by their team
+        // MANAGER & TECHNICIAN: See only their team's equipment
+        if (user.role === 'TECHNICIAN' || user.role === 'MANAGER') {
             const employee = await prisma.employee.findUnique({ where: { id: user.id } });
             if (employee?.maintenance_team_id) {
                 where.maintenance_team_id = employee.maintenance_team_id;
             }
-        } else if (user.role === Role.EMPLOYEE) {
-            // Employee sees ONLY equipment assigned to them (Owner)
+        } 
+        // EMPLOYEE: Sees ONLY equipment assigned to them (Owner)
+        else if (user.role === 'EMPLOYEE') {
             where.employee_id = user.id;
         }
-        // ADMIN / MANAGER see all (no extra filter)
+        // ADMIN sees all (no extra filter)
 
         // Search Filter
         if (search) {

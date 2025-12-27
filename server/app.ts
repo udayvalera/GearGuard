@@ -1,3 +1,6 @@
+
+import swaggerUi from 'swagger-ui-express';
+import { swaggerSpec } from './swagger.js';
 import express from 'express';
 import type { Request, Response, NextFunction } from 'express';
 import dotenv from 'dotenv';
@@ -27,6 +30,10 @@ app.use(helmet());
 app.use(morgan('dev'));
 
 // Routes
+
+// Swagger Documentation
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
 app.use(`${apiVersion}/auth`, authRoutes);
 app.use(`${apiVersion}/rbac`, rbacRoutes);
 app.use(`${apiVersion}/equipment`, equipmentRoutes);
