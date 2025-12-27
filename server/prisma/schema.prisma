@@ -1,5 +1,4 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+// prisma/schema.prisma
 
 generator client {
   provider = "prisma-client-js"
@@ -8,15 +7,168 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
 }
 
-model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  role      String   @default("user")
+// --------------------------------------
+// 1. Enums
+// --------------------------------------
+
+enum Role {
+  EMPLOYEE
+  TECHNICIAN
+  MANAGER
+  ADMIN
 }
 
+enum RequestType {
+  CORRECTIVE
+  PREVENTIVE
+}
+
+// --------------------------------------
+// 2. Organization & Personnel
+// --------------------------------------
+
+model Department {
+  id        Int         @id @default(autoincrement())
+  name      String      @unique
+  equipment Equipment[]
+}
+
+model MaintenanceTeam {
+  id        Int         @id @default(autoincrement())
+  name      String      @unique
+  employees Employee[]
+  equipment Equipment[]
+  requests  MaintenanceRequest[]
+}
+
+model Employee {
+  id                  Int       @id @default(autoincrement())
+  name                String
+  email               String    @unique
+  password            String    // Required for Auth
+  role                Role      @default(EMPLOYEE)
+  avatar_url          String?
+  
+  // Relation: Employee belongs to ONE team (Assumption ⚠️1 accepted)
+  maintenance_team_id Int?
+  maintenance_team    MaintenanceTeam? @relation(fields: [maintenance_team_id], references: [id])
+
+  // Inverse Relations
+  owned_equipment     Equipment[]          @relation("EquipmentOwner")
+  default_for_equip   Equipment[]          @relation("DefaultTechnician")
+  
+  created_requests    MaintenanceRequest[] @relation("CreatedBy")      // ❌ Added per requirement
+  assigned_requests   MaintenanceRequest[] @relation("AssignedTechnician")
+  
+  audit_logs          MaintenanceLog[]     @relation("LogAuthor")
+}
+
+// --------------------------------------
+// 3. Equipment Assets
+// --------------------------------------
+
+model EquipmentCategory {
+  id        Int         @id @default(autoincrement())
+  name      String      @unique
+  equipment Equipment[]
+}
+
+model Equipment {
+  id                    Int       @id @default(autoincrement())
+  name                  String
+  serial_number         String    @unique
+  purchase_date         DateTime?
+  warranty_info         String?
+  location              String
+  is_active             Boolean   @default(true) // False if Scrapped
+  
+  // Foreign Keys
+  department_id         Int?
+  department            Department? @relation(fields: [department_id], references: [id])
+
+  category_id           Int
+  category              EquipmentCategory @relation(fields: [category_id], references: [id])
+
+  employee_id           Int?      // The "Owner" of the device
+  employee              Employee? @relation("EquipmentOwner", fields: [employee_id], references: [id])
+
+  maintenance_team_id   Int       // For Auto-fill logic
+  maintenance_team      MaintenanceTeam @relation(fields: [maintenance_team_id], references: [id])
+
+  default_technician_id Int?      // For Auto-fill logic
+  default_technician    Employee? @relation("DefaultTechnician", fields: [default_technician_id], references: [id])
+
+  created_at            DateTime  @default(now())
+  updated_at            DateTime  @updatedAt
+
+  // Inverse Relations
+  maintenance_requests  MaintenanceRequest[]
+  logs                  MaintenanceLog[]
+}
+
+// --------------------------------------
+// 4. Maintenance Engine
+// --------------------------------------
+
+model MaintenanceStage {
+  id             Int      @id @default(autoincrement())
+  name           String   @unique // 'New', 'In Progress', 'Repaired', 'Scrap'
+  sequence       Int      // For Kanban ordering
+  is_scrap_state Boolean  @default(false) // Triggers Logic
+
+  requests       MaintenanceRequest[]
+}
+
+model MaintenanceRequest {
+  id             Int         @id @default(autoincrement())
+  subject        String
+  request_type   RequestType
+  scheduled_date DateTime?   // Required for Preventive
+  duration_hours Float?
+  
+  created_at     DateTime    @default(now())
+  closed_at      DateTime?
+  updated_at     DateTime    @updatedAt
+
+  // ❌ 1. Missing created_by (Added)
+  created_by_id  Int
+  created_by     Employee    @relation("CreatedBy", fields: [created_by_id], references: [id])
+
+  // Assignments
+  equipment_id   Int
+  equipment      Equipment   @relation(fields: [equipment_id], references: [id])
+
+  team_id        Int
+  team           MaintenanceTeam @relation(fields: [team_id], references: [id])
+
+  technician_id  Int?
+  technician     Employee?   @relation("AssignedTechnician", fields: [technician_id], references: [id])
+
+  stage_id       Int
+  stage          MaintenanceStage @relation(fields: [stage_id], references: [id])
+
+  // Logs
+  logs           MaintenanceLog[]
+}
+
+// --------------------------------------
+// 5. Audit & History (❌ 2. Added)
+// --------------------------------------
+
+model MaintenanceLog {
+  id            Int      @id @default(autoincrement())
+  message       String
+  created_at    DateTime @default(now())
+
+  // Relations
+  request_id    Int?
+  request       MaintenanceRequest? @relation(fields: [request_id], references: [id])
+
+  equipment_id  Int?
+  equipment     Equipment? @relation(fields: [equipment_id], references: [id])
+  
+  created_by_id Int?     // Optional: track who triggered the log
+  created_by    Employee? @relation("LogAuthor", fields: [created_by_id], references: [id])
+}
