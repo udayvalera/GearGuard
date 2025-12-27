@@ -36,6 +36,9 @@ model Employee {
   audit_logs          MaintenanceLog[]     @relation("LogAuthor")
   created_requests    MaintenanceRequest[] @relation("CreatedBy")
   assigned_requests   MaintenanceRequest[] @relation("AssignedTechnician")
+  
+  created_at          DateTime @default(now())
+  updated_at          DateTime @default(now()) @updatedAt
 }
 
 model EquipmentCategory {

@@ -1,3 +1,9 @@
+import { validate } from "../middleware/validate.middleware.js";
+import { 
+    createRequestSchema, 
+    assignRequestSchema, 
+    updateStatusSchema 
+} from "../schemas/request.schema.js";
 import { Router } from "express";
 import {
   createRequest,
@@ -138,7 +144,7 @@ router.get("/calendar", getCalendar);
  *       409:
  *         description: Equipment is scrapped
  */
-router.post("/", createRequest);
+router.post("/", validate(createRequestSchema), createRequest);
 
 /**
  * @swagger
@@ -255,7 +261,7 @@ router.get("/", getRequests);
  *       404:
  *         description: Request not found
  */
-router.patch("/:id/assign", assignRequest);
+router.patch("/:id/assign", validate(assignRequestSchema), assignRequest);
 
 /**
  * @swagger
@@ -307,7 +313,7 @@ router.patch("/:id/assign", assignRequest);
  *       404:
  *         description: Request not found
  */
-router.patch("/:id/status", updateStatus);
+router.patch("/:id/status", validate(updateStatusSchema), updateStatus);
 
 /**
  * @swagger

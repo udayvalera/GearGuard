@@ -9,10 +9,6 @@ const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey";
 export const signup = async (req: Request, res: Response): Promise<void> => {
     try {
         const { name, email, password, role } = req.body;
-        if (!email || !password || !name) {
-            res.status(400).json({ error: "Name, email, and password are required" });
-            return;
-        }
 
         const existingEmployee = await prisma.employee.findUnique({ where: { email } });
         if (existingEmployee) {
@@ -59,10 +55,6 @@ export const signup = async (req: Request, res: Response): Promise<void> => {
 export const login = async (req: Request, res: Response): Promise<void> => {
     try {
         const { email, password } = req.body;
-        if (!email || !password) {
-            res.status(400).json({ error: "Email and password are required" });
-            return;
-        }
 
         const employee = await prisma.employee.findUnique({ where: { email } });
         if (!employee) {
