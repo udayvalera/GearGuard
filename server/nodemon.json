@@ -7,5 +7,5 @@
         "dist",
         "node_modules"
     ],
-    "exec": "node --loader ts-node/esm server.ts"
+    "exec": "tsx server.ts"
 }

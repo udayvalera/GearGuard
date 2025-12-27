@@ -6,115 +6,129 @@ import jwt from "jsonwebtoken";
 const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || "supersecretkey";
 
-export const signup = async (req: Request, res: Response) => {
+export const signup = async (req: Request, res: Response): Promise<void> => {
     try {
-        const { email, password } = req.body;
-
-        if (!email || !password) {
-            res.status(400).json({ error: "Email and password are required" });
+        const { name, email, password, role } = req.body;
+        if (!email || !password || !name) {
+            res.status(400).json({ error: "Name, email, and password are required" });
             return;
         }
 
-        const existingUser = await prisma.user.findUnique({ where: { email } });
-        if (existingUser) {
-            res.status(400).json({ error: "User already exists" });
+        const existingEmployee = await prisma.employee.findUnique({ where: { email } });
+        if (existingEmployee) {
+            res.status(400).json({ error: "Employee already exists" });
             return;
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
-
-        const user = await prisma.user.create({
+        
+        // Note: For security, real apps should restrict setting 'role' here, 
+        // but we allow it for Phase 2 testing.
+        const employee = await prisma.employee.create({
             data: {
+                name,
                 email,
                 password: hashedPassword,
-                // role defaults to "user" in schema
+                role: role || "EMPLOYEE",
             },
         });
 
-        const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, {
-            expiresIn: "1h",
-        });
+        const token = jwt.sign(
+            { id: employee.id, email: employee.email, role: employee.role },
+            JWT_SECRET,
+            { expiresIn: "1h" }
+        );
 
         res.cookie("token", token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
             maxAge: 3600000, // 1 hour
+            sameSite: "strict"
         });
 
-        res.status(201).json({ message: "User created successfully", user: { id: user.id, email: user.email, role: user.role } });
+        res.status(201).json({ 
+            message: "User created successfully", 
+            user: { id: employee.id, name: employee.name, email: employee.email, role: employee.role } 
+        });
     } catch (error) {
         console.error("Signup error:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 };
 
-export const login = async (req: Request, res: Response) => {
+export const login = async (req: Request, res: Response): Promise<void> => {
     try {
         const { email, password } = req.body;
-
         if (!email || !password) {
             res.status(400).json({ error: "Email and password are required" });
             return;
         }
 
-        const user = await prisma.user.findUnique({ where: { email } });
-        if (!user) {
+        const employee = await prisma.employee.findUnique({ where: { email } });
+        if (!employee) {
             res.status(400).json({ error: "Invalid credentials" });
             return;
         }
 
-        const isMatch = await bcrypt.compare(password, user.password);
+        const isMatch = await bcrypt.compare(password, employee.password);
         if (!isMatch) {
             res.status(400).json({ error: "Invalid credentials" });
             return;
         }
 
-        const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, {
-            expiresIn: "1h",
-        });
+        const token = jwt.sign(
+            { id: employee.id, email: employee.email, role: employee.role },
+            JWT_SECRET,
+            { expiresIn: "1h" }
+        );
 
         res.cookie("token", token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
-            maxAge: 3600000, // 1 hour
+            maxAge: 3600000,
+            sameSite: "strict"
         });
 
-        res.status(200).json({ message: "Login successful", user: { id: user.id, email: user.email, role: user.role } });
+        res.status(200).json({ 
+            message: "Login successful", 
+            user: { id: employee.id, name: employee.name, email: employee.email, role: employee.role } 
+        });
     } catch (error) {
         console.error("Login error:", error);
         res.status(500).json({ error: "Internal server error" });
     }
 };
 
-export const logout = (req: Request, res: Response) => {
+export const logout = (req: Request, res: Response): void => {
     res.clearCookie("token");
     res.status(200).json({ message: "Logout successful" });
 };
 
-export const getMe = async (req: Request, res: Response) => {
+export const getMe = async (req: Request, res: Response): Promise<void> => {
     try {
-        const token = req.cookies.token;
+        // REFACTOR: Use req.user set by authenticate middleware
+        const userPayload = (req as any).user; 
 
-        if (!token) {
-            res.status(401).json({ error: "Not authenticated" });
-            return;
+        if (!userPayload) {
+             res.status(401).json({ error: "Not authenticated" });
+             return;
         }
 
-        const decoded = jwt.verify(token, JWT_SECRET) as { id: string };
-
-        const user = await prisma.user.findUnique({
-            where: { id: decoded.id },
-            select: { id: true, email: true, role: true, createdAt: true, updatedAt: true }
+        const employee = await prisma.employee.findUnique({
+            where: { id: userPayload.id },
+            select: { 
+                id: true, name: true, email: true, role: true, 
+                maintenance_team_id: true, created_at: true 
+            }
         });
 
-        if (!user) {
+        if (!employee) {
             res.status(404).json({ error: "User not found" });
             return;
         }
 
-        res.status(200).json({ user });
+        res.status(200).json({ user: employee });
     } catch (error) {
-        console.error("GetMe error:", error);
         res.status(401).json({ error: "Invalid token" });
     }
 };
