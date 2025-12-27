@@ -400,3 +400,66 @@ export const getCalendar = async (req: Request, res: Response): Promise<void> =>
         res.status(500).json({ error: "Internal Server Error" });
     }
 };
+// M3.2 Update Request Details (Rescheduling)
+export const updateRequestDetails = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const requestId = Number(req.params.id);
+        const { scheduled_date } = req.body;
+        const user = (req as any).user;
+
+        // 1. Fetch Request
+        const request = await prisma.maintenanceRequest.findUnique({
+            where: { id: requestId }
+        });
+
+        if (!request) {
+            res.status(404).json({ error: "Request not found" });
+            return;
+        }
+
+        // 2. Handle Rescheduling
+        if (scheduled_date) {
+            // Only allowed for Preventive Requests (usually)
+            if (request.request_type !== 'PREVENTIVE') {
+                res.status(400).json({ error: "Only Preventive requests can be rescheduled." });
+                return;
+            }
+
+            // Validate Future Date
+            const newDate = new Date(scheduled_date);
+            const today = new Date();
+            today.setHours(0,0,0,0);
+
+            if (newDate < today) {
+                res.status(400).json({ error: "Cannot reschedule to a past date." });
+                return;
+            }
+
+            // Transaction: Update + Log
+            await prisma.$transaction([
+                prisma.maintenanceRequest.update({
+                    where: { id: requestId },
+                    data: { scheduled_date: newDate }
+                }),
+                prisma.maintenanceLog.create({
+                    data: {
+                        request_id: requestId,
+                        equipment_id: request.equipment_id,
+                        message: `Rescheduled to ${newDate.toISOString().split('T')[0]}`,
+                        created_by_id: user.id
+                    }
+                })
+            ]);
+
+            res.json({ message: "Request rescheduled successfully" });
+            return;
+        }
+
+        res.status(400).json({ error: "No updateable fields provided" });
+
+    } catch (error) {
+        console.error("Update Details Error:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
+};
+
