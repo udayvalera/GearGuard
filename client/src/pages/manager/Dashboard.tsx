@@ -12,7 +12,7 @@ import {
 } from 'recharts';
 import { AlertTriangle, Trash2, Activity } from 'lucide-react';
 import { formatDistanceToNow, isPast, parseISO } from 'date-fns';
-import { KPICard } from '../../components/manager/KPICard';
+import { KPICard } from '../../components/common/KPICard';
 import { Card } from '../../components/design-system/Card';
 
 const Dashboard = () => {

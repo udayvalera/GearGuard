@@ -1,16 +1,19 @@
-import { Search, Bell, Plus } from 'lucide-react';
+import { useState } from 'react';
+import { Search, Plus } from 'lucide-react';
 import { Button } from './Button';
 import { Input } from './Input';
 import { useData } from '../../context/DataContext';
+import { CreateRequestModal } from '../modals/CreateRequestModal';
 
 export const TopBar = () => {
     const { currentUser } = useData();
+    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
     return (
         <header className="h-16 border-b border-[var(--color-border-200)] bg-[var(--color-surface-0)] flex items-center justify-between px-4 sticky top-0 z-10 w-full">
             {/* Left spacer for centering */}
             <div className="flex-1 min-w-0" />
-            
+
             {/* Centered Global Search - fixed width to prevent flex shrinking */}
             <div className="flex-shrink-0 w-[400px] transition-all duration-200">
                 <Input
@@ -22,16 +25,16 @@ export const TopBar = () => {
 
             {/* Right side actions */}
             <div className="flex-1 min-w-0 flex items-center justify-end gap-2">
-                <Button variant="primary" size="sm" leftIcon={<Plus size={16} />}>
+                <Button
+                    variant="primary"
+                    size="sm"
+                    leftIcon={<Plus size={16} />}
+                    onClick={() => setIsCreateModalOpen(true)}
+                >
                     Quick Create
                 </Button>
 
                 <div className="h-6 w-px bg-[var(--color-border-200)] mx-2"></div>
-
-                <Button variant="ghost" size="sm" className="relative text-[var(--color-text-secondary)]">
-                    <Bell size={20} />
-                    <span className="absolute top-1 right-2 w-2 h-2 bg-[var(--color-error-600)] rounded-full border-2 border-[var(--color-surface-0)]"></span>
-                </Button>
 
                 <div className="flex items-center gap-3 pl-2">
                     <img
@@ -41,6 +44,11 @@ export const TopBar = () => {
                     />
                 </div>
             </div>
+
+            <CreateRequestModal
+                isOpen={isCreateModalOpen}
+                onClose={() => setIsCreateModalOpen(false)}
+            />
         </header>
     );
 };

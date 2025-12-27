@@ -1,24 +1,19 @@
 import React from "react";
 import { useAuth } from "../context/AuthContext";
+import ManagerDashboard from './manager/Dashboard';
+import EmployeeDashboard from './employee/Dashboard';
+import AdminDashboard from './admin/Dashboard';
+import TechnicianDashboard from './technician/Dashboard';
 
 const Protected: React.FC = () => {
-    const { user, logout } = useAuth();
+    const { user } = useAuth();
+    const role = user?.role;
 
-    return (
-        <div className="p-8">
-            <h1 className="text-3xl font-bold mb-4">Protected Dashboard</h1>
-            <div className="bg-white p-6 rounded shadow-md">
-                <p className="mb-4">Welcome back, <strong>{user?.email}</strong>!</p>
-                <p className="mb-4 text-gray-600">This page is only accessible to authenticated users.</p>
-                <button
-                    onClick={() => logout()}
-                    className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition"
-                >
-                    Logout
-                </button>
-            </div>
-        </div>
-    );
+    if (role === 'admin') return <AdminDashboard />;
+    if (role === 'manager') return <ManagerDashboard />;
+    if (role === 'technician') return <TechnicianDashboard />;
+
+    return <EmployeeDashboard />;
 };
 
 export default Protected;
