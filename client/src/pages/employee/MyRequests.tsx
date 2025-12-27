@@ -1,15 +1,17 @@
-import { useMemo } from 'react';
-import { useData } from '../../context/DataContext';
+// import { useMemo } from 'react';
+// import { useData } from '../../context/DataContext';
+import { useMyRequests, useMyEquipment } from '../../hooks/useEmployeeData';
 import { Card } from '../../components/design-system/Card';
 import { Badge } from '../../components/design-system/Badge';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import { Clock, CheckCircle, AlertTriangle } from 'lucide-react';
 
 const MyRequests = () => {
-    const { requests, equipment } = useData();
+    // const { requests, equipment } = useData();
+    const { requests: myRequests, loading } = useMyRequests();
+    const { equipment } = useMyEquipment(); // Needed for equipment name lookup
 
-    // Mock filtering - in real app would match current user ID
-    const myRequests = requests;
+    if (loading) return <div className="p-8 text-center text-[var(--color-text-secondary)]">Loading requests...</div>;
 
     const getStatusIcon = (status: string) => {
         switch (status) {
