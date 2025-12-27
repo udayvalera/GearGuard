@@ -8,7 +8,8 @@ import cookieParser from 'cookie-parser';
 
 import authRoutes from './routes/auth.routes.js';
 import rbacRoutes from './routes/rbac.routes.js';
-import equipmentRoutes from './routes/equipment.routes.js'; // 👈 Added
+import equipmentRoutes from './routes/equipment.routes.js';
+import requestRoutes from './routes/request.routes.js'; // 👈 Added
 
 dotenv.config();
 
@@ -28,7 +29,8 @@ app.use(morgan('dev'));
 // Routes
 app.use(`${apiVersion}/auth`, authRoutes);
 app.use(`${apiVersion}/rbac`, rbacRoutes);
-app.use(`${apiVersion}/equipment`, equipmentRoutes); // 👈 Mount RBAC routes
+app.use(`${apiVersion}/equipment`, equipmentRoutes);
+app.use(`${apiVersion}/requests`, requestRoutes); // 👈 Mount RBAC routes
 
 // Health Check
 app.get('/', (req: Request, res: Response) => {
