@@ -20,6 +20,9 @@ model MaintenanceTeam {
   employees Employee[]
   equipment Equipment[]
   requests  MaintenanceRequest[]
+
+  manager_id Int?
+  manager    Employee? @relation("TeamManager", fields: [manager_id], references: [id])
 }
 
 model Employee {
@@ -36,9 +39,12 @@ model Employee {
   audit_logs          MaintenanceLog[]     @relation("LogAuthor")
   created_requests    MaintenanceRequest[] @relation("CreatedBy")
   assigned_requests   MaintenanceRequest[] @relation("AssignedTechnician")
-  
-  created_at          DateTime @default(now())
-  updated_at          DateTime @default(now()) @updatedAt
+
+  // Managed Teams Relation
+  managed_teams MaintenanceTeam[] @relation("TeamManager")
+
+  created_at DateTime @default(now())
+  updated_at DateTime @default(now()) @updatedAt
 }
 
 model EquipmentCategory {

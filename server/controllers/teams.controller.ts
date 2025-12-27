@@ -13,6 +13,12 @@ export const getMaintenanceTeams = async (
       select: {
         id: true,
         name: true,
+        manager: {
+          select: {
+            id: true,
+            name: true
+          }
+        }
       },
       orderBy: { name: "asc" },
     });
@@ -26,9 +32,12 @@ export const getMaintenanceTeams = async (
 
 export const createTeam = async (req: Request, res: Response) => {
   try {
-    const { name } = req.body;
+    const { name, manager_id } = req.body;
     const team = await prisma.maintenanceTeam.create({
-      data: { name },
+      data: {
+        name,
+        manager_id: manager_id ? Number(manager_id) : undefined
+      },
     });
     res.status(201).json(team);
   } catch (error) {
@@ -40,10 +49,13 @@ export const createTeam = async (req: Request, res: Response) => {
 export const updateTeam = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { name } = req.body;
+    const { name, manager_id } = req.body;
     const team = await prisma.maintenanceTeam.update({
       where: { id: parseInt(id) },
-      data: { name },
+      data: {
+        name,
+        manager_id: manager_id ? Number(manager_id) : null
+      },
     });
     res.json(team);
   } catch (error) {

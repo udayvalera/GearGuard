@@ -7,31 +7,57 @@ import { KanbanCard } from '../../components/common/KanbanCard';
 import { CheckCircle, Clock, Calendar as CalendarIcon } from 'lucide-react';
 
 const TechnicianDashboard = () => {
-    const { requests, equipment, users } = useData();
+    const { requests, equipment, users, reassignTechnician, loading } = useData();
     const { user } = useAuth();
 
     const technicians = useMemo(() => users.filter(u => u.role === 'TECHNICIAN'), [users]);
 
-    // Mock filtering for "My Assigned Tasks"
+    // Filter for "My Assigned Tasks"
     const myTasks = useMemo(() => {
-        // In real app, filter by user.id aka assignedTechId
-        return requests.filter(r => r.assignedTechId === user?.id || r.assignedTechId === undefined); // Showing unassigned too for demo
-    }, [requests, user?.id]);
+        // Filter by assignedTechId
+        if (!user) return [];
+        return requests.filter(r => r.assignedTechId === user.id);
+    }, [requests, user]);
 
     const kpis = useMemo(() => {
         const assigned = myTasks.filter(r => r.status !== 'Repaired' && r.status !== 'Scrap').length;
-        const completedToday = myTasks.filter(r => r.status === 'Repaired').length; // Mock, needs date check
-        const upcoming = 2; // Mock preventive count
+
+        // Count completed today
+        const completedToday = myTasks.filter(r =>
+            r.status === 'Repaired' &&
+            // Check logs or closed_at if available in type? 
+            // We mapped `dueDate` and `createdAt`. We might not have `closedAt` in MaintenanceRequest type yet.
+            // Using a loose check if `r.status === 'Repaired'` and `r.updatedAt` is today? 
+            // We don't have updatedAt. Let's use a simplified check or `dueDate` if it was today?
+            // Actually, let's keep it simple: Filter 'Repaired' and if the count matches local state tracking or just total repaired assigned to me?
+            // Better: just count 'Repaired' tasks assigned to me for now.
+            r.status === 'Repaired'
+        ).length;
+
+        // Upcoming Preventive
+        const upcoming = myTasks.filter(r =>
+            r.type === 'Preventive' &&
+            r.status === 'New'
+        ).length;
 
         return { assigned, completedToday, upcoming };
     }, [myTasks]);
 
 
     const handleReassign = (reqId: string, techId: string) => {
-        console.log("Reassign", reqId, techId);
-        // Implement reassign logic here (likely via context function)
+        reassignTechnician(reqId, techId);
     };
 
+    const todaysSchedule = useMemo(() => {
+        const todayStr = new Date().toISOString().split('T')[0];
+        return myTasks.filter(r =>
+            r.dueDate.startsWith(todayStr) &&
+            r.status !== 'Repaired' &&
+            r.status !== 'Scrap'
+        ).sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+    }, [myTasks]);
+
+    if (loading) return <div>Loading...</div>;
 
     return (
         <div className="space-y-6">
@@ -54,7 +80,7 @@ const TechnicianDashboard = () => {
                     variant="neutral"
                 />
                 <KPICard
-                    title="Completed Today"
+                    title="Completed"
                     value={kpis.completedToday}
                     icon={<CheckCircle size={24} />}
                     variant="neutral"
@@ -83,7 +109,7 @@ const TechnicianDashboard = () => {
                         ))}
                         {myTasks.length === 0 && (
                             <Card className="col-span-2 p-8 text-center text-[var(--color-text-tertiary)]">
-                                No tasks assigned. Nice work!
+                                No tasks assigned.
                             </Card>
                         )}
                     </div>
@@ -94,20 +120,21 @@ const TechnicianDashboard = () => {
                     <h2 className="text-lg font-bold text-[var(--color-text-primary)]">Today's Schedule</h2>
                     <Card>
                         <div className="space-y-4">
-                            <div className="flex gap-3 border-l-2 border-[var(--color-brand-500)] pl-3">
-                                <div>
-                                    <p className="text-xs font-bold text-[var(--color-brand-600)]">09:00 AM</p>
-                                    <p className="text-sm font-medium text-[var(--color-text-primary)]">Daily Inspection - CNC 01</p>
-                                    <p className="text-xs text-[var(--color-text-secondary)]">Routine Check</p>
-                                </div>
-                            </div>
-                            <div className="flex gap-3 border-l-2 border-[var(--color-warning-500)] pl-3">
-                                <div>
-                                    <p className="text-xs font-bold text-[var(--color-warning-600)]">11:30 AM</p>
-                                    <p className="text-sm font-medium text-[var(--color-text-primary)]">Filter Replacement</p>
-                                    <p className="text-xs text-[var(--color-text-secondary)]">Hydraulic Press A</p>
-                                </div>
-                            </div>
+                            {todaysSchedule.length > 0 ? (
+                                todaysSchedule.map(task => (
+                                    <div key={task.id} className="flex gap-3 border-l-2 border-[var(--color-brand-500)] pl-3">
+                                        <div>
+                                            <p className="text-xs font-bold text-[var(--color-brand-600)]">
+                                                {new Date(task.dueDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            </p>
+                                            <p className="text-sm font-medium text-[var(--color-text-primary)]">{task.title}</p>
+                                            <p className="text-xs text-[var(--color-text-secondary)]">{task.type}</p>
+                                        </div>
+                                    </div>
+                                ))
+                            ) : (
+                                <p className="text-sm text-[var(--color-text-secondary)]">No scheduled tasks for today.</p>
+                            )}
                         </div>
                     </Card>
                 </div>
