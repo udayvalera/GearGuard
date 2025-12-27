@@ -17,7 +17,7 @@ export const signup = async (req: Request, res: Response): Promise<void> => {
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
-        
+
         // Note: For security, real apps should restrict setting 'role' here, 
         // but we allow it for Phase 2 testing.
         const employee = await prisma.employee.create({
@@ -42,9 +42,9 @@ export const signup = async (req: Request, res: Response): Promise<void> => {
             sameSite: "strict"
         });
 
-        res.status(201).json({ 
-            message: "User created successfully", 
-            user: { id: employee.id, name: employee.name, email: employee.email, role: employee.role } 
+        res.status(201).json({
+            message: "User created successfully",
+            user: { id: employee.id, name: employee.name, email: employee.email, role: employee.role }
         });
     } catch (error) {
         console.error("Signup error:", error);
@@ -81,9 +81,9 @@ export const login = async (req: Request, res: Response): Promise<void> => {
             sameSite: "strict"
         });
 
-        res.status(200).json({ 
-            message: "Login successful", 
-            user: { id: employee.id, name: employee.name, email: employee.email, role: employee.role } 
+        res.status(200).json({
+            message: "Login successful",
+            user: { id: employee.id, name: employee.name, email: employee.email, role: employee.role }
         });
     } catch (error) {
         console.error("Login error:", error);
@@ -99,18 +99,18 @@ export const logout = (req: Request, res: Response): void => {
 export const getMe = async (req: Request, res: Response): Promise<void> => {
     try {
         // REFACTOR: Use req.user set by authenticate middleware
-        const userPayload = (req as any).user; 
+        const userPayload = (req as any).user;
 
         if (!userPayload) {
-             res.status(401).json({ error: "Not authenticated" });
-             return;
+            res.status(401).json({ error: "Not authenticated" });
+            return;
         }
 
         const employee = await prisma.employee.findUnique({
             where: { id: userPayload.id },
-            select: { 
-                id: true, name: true, email: true, role: true, 
-                maintenance_team_id: true, created_at: true 
+            select: {
+                id: true, name: true, email: true, role: true,
+                maintenance_team_id: true
             }
         });
 
@@ -121,6 +121,7 @@ export const getMe = async (req: Request, res: Response): Promise<void> => {
 
         res.status(200).json({ user: employee });
     } catch (error) {
+        console.log(error);
         res.status(401).json({ error: "Invalid token" });
     }
 };

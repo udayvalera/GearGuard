@@ -1,13 +1,9 @@
-import { useState } from 'react';
-import { Search, Plus } from 'lucide-react';
-import { Button } from './Button';
+import { Search } from 'lucide-react';
 import { Input } from './Input';
 import { useData } from '../../context/DataContext';
-import { CreateRequestModal } from '../modals/CreateRequestModal';
 
 export const TopBar = () => {
     const { currentUser } = useData();
-    const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
     return (
         <header className="h-16 border-b border-[var(--color-border-200)] bg-[var(--color-surface-0)] flex items-center justify-between px-4 sticky top-0 z-10 w-full">
@@ -25,14 +21,7 @@ export const TopBar = () => {
 
             {/* Right side actions */}
             <div className="flex-1 min-w-0 flex items-center justify-end gap-2">
-                <Button
-                    variant="primary"
-                    size="sm"
-                    leftIcon={<Plus size={16} />}
-                    onClick={() => setIsCreateModalOpen(true)}
-                >
-                    Quick Create
-                </Button>
+
 
                 <div className="h-6 w-px bg-[var(--color-border-200)] mx-2"></div>
 
@@ -45,10 +34,7 @@ export const TopBar = () => {
                 </div>
             </div>
 
-            <CreateRequestModal
-                isOpen={isCreateModalOpen}
-                onClose={() => setIsCreateModalOpen(false)}
-            />
+
         </header>
     );
 };

@@ -1,6 +1,10 @@
 import { useState } from 'react';
-import { useData } from '../../context/DataContext';
+// import { useData } from '../../context/DataContext';
+import { useMyEquipment, useEmployeeData } from '../../hooks/useEmployeeData';
+import { createRequest } from '../../api/requests';
+import type { RequestPriority } from '../../types';
 import { Button } from '../design-system/Button';
+import { Input } from '../design-system/Input';
 import { X, AlertCircle } from 'lucide-react';
 
 interface CreateRequestModalProps {
@@ -9,33 +13,48 @@ interface CreateRequestModalProps {
 }
 
 export const CreateRequestModal = ({ isOpen, onClose }: CreateRequestModalProps) => {
-    const { equipment, createRequest, currentUser } = useData();
+    const { equipment } = useMyEquipment(); // Use real equipment data
+    const { refreshData } = useEmployeeData(); // To refresh dashboard after create
+
+    // State
     const [title, setTitle] = useState('');
     const [equipmentId, setEquipmentId] = useState('');
-    const [priority, setPriority] = useState('Medium');
+    const [priority, setPriority] = useState<RequestPriority>('Medium');
     const [description, setDescription] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     if (!isOpen) return null;
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setError(null);
+        setIsSubmitting(true);
 
-        // Mock create logic using context
-        createRequest({
-            title,
-            description,
-            priority,
-            equipmentId,
-            status: 'New',
-            type: 'Corrective', // Default
-            createdBy: currentUser.id
-        });
+        try {
+            await createRequest({
+                subject: title,
+                description,
+                priority,
+                equipment_id: Number(equipmentId),
+                request_type: 'CORRECTIVE', // Default for now
+            });
 
-        onClose();
-        // Reset form
-        setTitle('');
-        setEquipmentId('');
-        setDescription('');
+            // Refresh dashboard data
+            await refreshData();
+
+            // Reset and close
+            setTitle('');
+            setEquipmentId('');
+            setDescription('');
+            setPriority('Medium');
+            onClose();
+        } catch (err: any) {
+            console.error("Failed to create request:", err);
+            setError(err.response?.data?.message || "Failed to create request. Please try again.");
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
@@ -48,24 +67,27 @@ export const CreateRequestModal = ({ isOpen, onClose }: CreateRequestModalProps)
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">Issue Title</label>
-                        <input
-                            type="text"
-                            required
-                            className="w-full h-10 px-3 rounded-[var(--radius-md)] border border-[var(--color-border-200)] focus:ring-2 focus:ring-[var(--color-brand-100)] focus:border-[var(--color-brand-500)] outline-none transition-all"
-                            placeholder="e.g. Pump Leaking"
-                            value={title}
-                            onChange={e => setTitle(e.target.value)}
-                        />
+                {error && (
+                    <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-md text-sm flex items-center gap-2">
+                        <AlertCircle size={16} />
+                        {error}
                     </div>
+                )}
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <Input
+                        label="Issue Title"
+                        placeholder="e.g. Pump Leaking"
+                        value={title}
+                        onChange={e => setTitle(e.target.value)}
+                        required
+                    />
 
                     <div>
                         <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">Affected Equipment</label>
                         <select
                             required
-                            className="w-full h-10 px-3 rounded-[var(--radius-md)] border border-[var(--color-border-200)] focus:ring-2 focus:ring-[var(--color-brand-100)] focus:border-[var(--color-brand-500)] outline-none transition-all bg-white"
+                            className="w-full h-10 px-3 rounded-[var(--radius-md)] border border-[var(--color-border-200)] focus:ring-2 focus:ring-[var(--color-brand-100)] focus:border-[var(--color-brand-500)] outline-none transition-all bg-white text-sm"
                             value={equipmentId}
                             onChange={e => setEquipmentId(e.target.value)}
                         >
@@ -79,7 +101,7 @@ export const CreateRequestModal = ({ isOpen, onClose }: CreateRequestModalProps)
                     <div>
                         <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">Priority</label>
                         <div className="flex gap-2">
-                            {['Low', 'Medium', 'High'].map(p => (
+                            {(['Low', 'Medium', 'High'] as RequestPriority[]).map(p => (
                                 <button
                                     key={p}
                                     type="button"
@@ -99,7 +121,7 @@ export const CreateRequestModal = ({ isOpen, onClose }: CreateRequestModalProps)
                         <label className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1">Description</label>
                         <textarea
                             rows={3}
-                            className="w-full p-3 rounded-[var(--radius-md)] border border-[var(--color-border-200)] focus:ring-2 focus:ring-[var(--color-brand-100)] focus:border-[var(--color-brand-500)] outline-none transition-all"
+                            className="w-full p-3 rounded-[var(--radius-md)] border border-[var(--color-border-200)] focus:ring-2 focus:ring-[var(--color-brand-100)] focus:border-[var(--color-brand-500)] outline-none transition-all text-sm"
                             placeholder="Describe the problem details..."
                             value={description}
                             onChange={e => setDescription(e.target.value)}
@@ -107,10 +129,10 @@ export const CreateRequestModal = ({ isOpen, onClose }: CreateRequestModalProps)
                     </div>
 
                     <div className="flex justify-end gap-3 pt-4">
-                        <Button variant="ghost" type="button" onClick={onClose}>
+                        <Button variant="ghost" type="button" onClick={onClose} disabled={isSubmitting}>
                             Cancel
                         </Button>
-                        <Button variant="primary" type="submit">
+                        <Button variant="primary" type="submit" isLoading={isSubmitting}>
                             Create Ticket
                         </Button>
                     </div>

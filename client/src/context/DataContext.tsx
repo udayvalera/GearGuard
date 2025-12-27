@@ -58,7 +58,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 : eq
         ));
 
-        // 3. Cancel future preventive maintenance for this equipment
         setRequests(prev => prev.filter(req => {
             // Keep if it's NOT (the target equipment AND Preventive AND New)
             const isFuturePreventive = req.equipmentId === equipmentId &&
